@@ -382,6 +382,13 @@
   .color-swatch { width:28px; height:28px; border-radius:8px; cursor:pointer; border:2px solid transparent; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.15); transition: transform 0.1s; }
   .color-swatch:active { transform: scale(0.9); }
   .color-swatch.sel { border-color: var(--text); }
+  .wheel-wrap { position:relative; display:flex; flex-direction:column; align-items:center; padding-top:14px; }
+  .wheel-wrap canvas { max-width:82vw; width:300px; height:300px; image-rendering:pixelated; }
+  .wheel-pointer { position:absolute; top:0; left:50%; transform:translateX(-50%); font-size:1.6rem; color:var(--accent2); z-index:2; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3)); }
+  .booster-result { text-align:center; margin:14px 0; font-size:1.15rem; min-height:1.6em; }
+  .booster-result strong { font-size:1.25rem; }
+  .booster-result.pop { animation: boosterPop 0.4s ease; }
+  @keyframes boosterPop { 0%{transform:scale(0.7);opacity:0;} 60%{transform:scale(1.12);} 100%{transform:scale(1);opacity:1;} }
 </style>
 </head>
 <body>
@@ -1478,6 +1485,47 @@ const AUDIO = (() => {
 })();
 
 /* =========================================================
+   SFX — short UI sound effects (wheel of fortune)
+   ========================================================= */
+const SFX = (() => {
+  let actx = null;
+  function ac() {
+    if (!actx) { const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return null; actx = new AC(); }
+    if (actx.state === 'suspended') actx.resume();
+    return actx;
+  }
+  // a single peg "tick" — short filtered click
+  function tick(vol=0.14) {
+    const c = ac(); if (!c) return;
+    const now = c.currentTime;
+    const o = c.createOscillator(); o.type = 'square'; o.frequency.value = 900 + Math.random()*180;
+    const gn = c.createGain(); gn.gain.value = 0;
+    const filt = c.createBiquadFilter(); filt.type='highpass'; filt.frequency.value = 600;
+    o.connect(filt); filt.connect(gn); gn.connect(c.destination);
+    gn.gain.setValueAtTime(0, now);
+    gn.gain.linearRampToValueAtTime(vol, now + 0.002);
+    gn.gain.exponentialRampToValueAtTime(0.0001, now + 0.06);
+    o.start(now); o.stop(now + 0.07);
+  }
+  // a little win chime when the wheel stops
+  function chime() {
+    const c = ac(); if (!c) return;
+    const notes = [523.25, 659.25, 783.99]; // C E G
+    notes.forEach((f, i) => {
+      const now = c.currentTime + i*0.11;
+      const o = c.createOscillator(); o.type='sine'; o.frequency.value = f;
+      const gn = c.createGain(); gn.gain.value = 0;
+      o.connect(gn); gn.connect(c.destination);
+      gn.gain.setValueAtTime(0, now);
+      gn.gain.linearRampToValueAtTime(0.16, now + 0.02);
+      gn.gain.exponentialRampToValueAtTime(0.0001, now + 0.5);
+      o.start(now); o.stop(now + 0.55);
+    });
+  }
+  return { tick, chime };
+})();
+
+/* =========================================================
    I18N — LANGUAGE SYSTEM
    ========================================================= */
 let LANG = store.get('lang', (navigator.language||'it').startsWith('en') ? 'en' : 'it');
@@ -1495,7 +1543,11 @@ const I18N = {
     todo_name:'To-do e Agenda', todo_desc:'Attività e giornata per fasce orarie',
     workout_name:'Allenamento', workout_desc:'Esercizi, serie e ripetizioni',
     breath_name:'Respirazione', breath_desc:'Esercizi guidati anti-stress',
-    mood_name:'Umore e Obiettivi', mood_desc:'Come ti senti + 3 obiettivi settimana',
+    mood_name:'Umore e Obiettivi', mood_desc:'Umore, obiettivi e ruota Mood-Booster',
+    booster_name:'Mood-Booster', booster_desc:'Gira la ruota e tirati su di morale',
+    booster_spin:'Gira la ruota', booster_result:'Fai questo:', booster_add:'Aggiungi attività',
+    booster_ph:'Nuova attività...', booster_manage:'Le tue attività', booster_need_two:'Servono almeno 2 attività',
+    booster_activities:['Scrivi a un amico','Chiama un familiare','Fai una passeggiata','Disegna / Scrivi / Suona uno strumento','Ascolta una canzone legata a un ricordo','Incontra qualcuno','Balla!','Allenati','Fai degli esercizi di respirazione','Vai al cinema','Bevi un caffè o un tè'],
     shop_name:'Lista spesa', shop_desc:'Articoli da comprare',
     expense_name:'Spese', expense_desc:'Spese per categoria, mese e anno',
     calendar_name:'Calendario', calendar_desc:'Scadenze, pagamenti, compleanni ed eventi',
@@ -1570,7 +1622,11 @@ const I18N = {
     todo_name:'To-do & Planner', todo_desc:'Tasks and daily time slots',
     workout_name:'Workout', workout_desc:'Exercises, sets and reps',
     breath_name:'Breathing', breath_desc:'Guided anti-stress exercises',
-    mood_name:'Mood & Goals', mood_desc:'How you feel + 3 weekly goals',
+    mood_name:'Mood & Goals', mood_desc:'Mood, goals and the Mood-Booster wheel',
+    booster_name:'Mood-Booster', booster_desc:'Spin the wheel and lift your mood',
+    booster_spin:'Spin the wheel', booster_result:'Do this:', booster_add:'Add activity',
+    booster_ph:'New activity...', booster_manage:'Your activities', booster_need_two:'You need at least 2 activities',
+    booster_activities:['Text a friend','Call a family member','Take a walk','Draw / Write / Play an instrument','Listen to a song tied to a memory','Meet someone','Dance!','Work out','Do some breathing exercises','Go to the cinema','Have a coffee or tea'],
     shop_name:'Shopping list', shop_desc:'Items to buy',
     expense_name:'Expenses', expense_desc:'Spending by category, month & year',
     calendar_name:'Calendar', calendar_desc:'Deadlines, payments, birthdays & events',
@@ -1857,6 +1913,20 @@ const ICONS = {
     '.hhhhpphhhh.',
     '.hhhhhhhhhh.',
     '.hhhhhhhhhh.',
+    '............'
+  ],
+  wheel: [ // colorful spin wheel with pointer at top
+    '.....q......',
+    '...bbbbbb...',
+    '..bccddeeb..',
+    '.bccddeeffb.',
+    '.bccddeeffb.',
+    'bbccddeeffgb',
+    'bbccddeeffgb',
+    '.bccddeeffb.',
+    '.bccddeeffb.',
+    '..bccddeeb..',
+    '...bbbbbb...',
     '............'
   ],
 };
@@ -2217,6 +2287,26 @@ function buildMood(root) {
   const moods = store.get('moods', {});
   const todayMood = moods[key];
   root.innerHTML = `
+    <div class="segmented" id="moodSeg">
+      <button class="active" data-tab="mood">${t('mood_name')}</button>
+      <button data-tab="booster">${t('booster_name')}</button>
+    </div>
+    <div id="moodMain"></div>
+    <div id="moodBooster" style="display:none;"></div>`;
+  const seg = $('#moodSeg', root);
+  seg.addEventListener('click', e => {
+    if (!e.target.dataset.tab) return;
+    $$('button', seg).forEach(b => b.classList.remove('active'));
+    e.target.classList.add('active');
+    const isB = e.target.dataset.tab === 'booster';
+    $('#moodMain', root).style.display = isB ? 'none' : '';
+    const bEl = $('#moodBooster', root);
+    bEl.style.display = isB ? '' : 'none';
+    if (isB && !bEl.dataset.built) { buildBooster(bEl); bEl.dataset.built = '1'; }
+  });
+
+  const main = $('#moodMain', root);
+  main.innerHTML = `
     <div class="card">
       <div class="section-title" style="margin-top:0;">${t('how_feel')}</div>
       <div class="mood-picker" id="moodPick"></div>
@@ -2292,6 +2382,161 @@ function getWeekKey(d=new Date()) {
   const onejan = new Date(d.getFullYear(),0,1);
   const week = Math.ceil((((d-onejan)/86400000)+onejan.getDay()+1)/7);
   return d.getFullYear()+'-w'+week;
+}
+
+/* =========================================================
+   MOOD-BOOSTER (spin the wheel)
+   ========================================================= */
+function buildBooster(root) {
+  const WHEEL_COLORS = ['#8b7cf6','#f472b6','#34d399','#fbbf24','#4aa3f0','#ff9a76','#a5b4fc','#5ee7d0','#f4b9b2','#c4a7f0'];
+  const BOOSTER_DEFAULTS_VER = 2;
+  function getActs() {
+    const savedVer = store.get('boosterActsVer', 0);
+    let a = store.get('boosterActs', null);
+    // seed on first use, or refresh to new defaults when the built-in list is updated
+    if (!a || savedVer < BOOSTER_DEFAULTS_VER) {
+      a = t('booster_activities').slice();
+      store.set('boosterActs', a);
+      store.set('boosterActsVer', BOOSTER_DEFAULTS_VER);
+    }
+    return a;
+  }
+  function saveActs(a) { store.set('boosterActs', a); }
+
+  root.innerHTML = `
+    <div class="wheel-wrap">
+      <div class="wheel-pointer">▼</div>
+      <canvas id="wheelCanvas" width="300" height="300"></canvas>
+    </div>
+    <button class="btn" id="spinBtn" style="width:100%; margin-top:8px;">${t('booster_spin')}</button>
+    <div id="spinResult" class="booster-result"></div>
+    <div class="section-title">${t('booster_manage')}</div>
+    <div class="row" style="margin-bottom:12px;">
+      <input id="actInput" placeholder="${t('booster_ph')}" />
+      <button class="btn" id="actAdd">+</button>
+    </div>
+    <div id="actList"></div>`;
+
+  const canvas = $('#wheelCanvas', root);
+  const ctx = canvas.getContext('2d');
+  const size = 300, cx = size/2, cy = size/2, r = size/2 - 6;
+  const LO = 90;                       // low-res buffer for the pixelated look
+  const buf = document.createElement('canvas'); buf.width = LO; buf.height = LO;
+  const bctx = buf.getContext('2d');
+  ctx.imageSmoothingEnabled = false;   // keep upscale blocky
+  let angle = 0, spinning = false;
+
+  function hexToRgb(h){ h=h.replace('#',''); return [parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)]; }
+  const RGB = WHEEL_COLORS.map(hexToRgb);
+
+  function drawWheel() {
+    const acts = getActs();
+    ctx.clearRect(0,0,size,size);
+    if (acts.length === 0) return;
+    const seg = (Math.PI*2) / acts.length;
+
+    // --- pixel pie: compute each pixel of the low-res buffer ---
+    const img = bctx.createImageData(LO, LO);
+    const d = img.data;
+    const c = LO/2, rad = LO/2 - 1;
+    for (let y=0; y<LO; y++) {
+      for (let x=0; x<LO; x++) {
+        const dx = x - c + 0.5, dy = y - c + 0.5;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        const o = (y*LO + x)*4;
+        if (dist > rad) { d[o+3] = 0; continue; }         // transparent outside
+        if (dist < rad*0.16) {                              // white hub
+          d[o]=255; d[o+1]=255; d[o+2]=255; d[o+3]=255; continue;
+        }
+        let ang = Math.atan2(dy, dx) - angle;
+        ang = ((ang % (Math.PI*2)) + Math.PI*2) % (Math.PI*2);
+        const idx = Math.floor(ang / seg) % acts.length;
+        const col = RGB[idx % RGB.length];
+        // darker pixel border between segments + outer rim
+        const inSeg = ang % seg;
+        const edge = inSeg < 0.05 || inSeg > seg-0.05 || dist > rad-2;
+        if (edge) { d[o]=col[0]*0.6; d[o+1]=col[1]*0.6; d[o+2]=col[2]*0.6; d[o+3]=255; }
+        else { d[o]=col[0]; d[o+1]=col[1]; d[o+2]=col[2]; d[o+3]=255; }
+      }
+    }
+    bctx.putImageData(img, 0, 0);
+    // blit scaled up, blocky
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(buf, 0, 0, size, size);
+
+    // pixel hub ring (no labels on the wheel — the chosen one shows below)
+    ctx.strokeStyle = '#2a2440'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(cx,cy, r*0.16, 0, Math.PI*2); ctx.stroke();
+  }
+
+  function spin() {
+    const acts = getActs();
+    if (acts.length < 2) { toast(t('booster_need_two')); return; }
+    if (spinning) return;
+    spinning = true;
+    $('#spinResult', root).textContent = '';
+    const spins = 9 + Math.random()*5;                 // more full turns
+    const target = angle + spins*Math.PI*2 + Math.random()*Math.PI*2;
+    const start = angle, dur = 7500, t0 = performance.now();
+    const segSpin = (Math.PI*2)/acts.length;
+    let lastTickSeg = Math.floor(start / segSpin);
+    function frame(now) {
+      const p = Math.min(1, (now - t0)/dur);
+      const ease = 1 - Math.pow(1 - p, 4);             // ease-out quart (smooth long slow-down)
+      angle = start + (target - start)*ease;
+      // tick once per segment boundary crossed (auto-slows with the wheel)
+      const curSeg = Math.floor(angle / segSpin);
+      if (curSeg !== lastTickSeg) {
+        const crossed = Math.abs(curSeg - lastTickSeg);
+        // avoid a burst of ticks if many segments passed in one frame early on
+        if (crossed <= 3) for (let k=0;k<crossed;k++) SFX.tick(0.10 + 0.06*p);
+        else SFX.tick(0.12);
+        lastTickSeg = curSeg;
+      }
+      drawWheel();
+      if (p < 1) requestAnimationFrame(frame);
+      else {
+        spinning = false;
+        // determine which segment is under the pointer (top, -90deg)
+        const seg = (Math.PI*2)/acts.length;
+        const norm = ((-Math.PI/2 - angle) % (Math.PI*2) + Math.PI*2) % (Math.PI*2);
+        const idx = Math.floor(norm / seg) % acts.length;
+        const res = $('#spinResult', root);
+        const col = WHEEL_COLORS[idx % WHEEL_COLORS.length];
+        res.innerHTML = `<div class="muted">${t('booster_result')}</div>
+          <div style="display:flex;align-items:center;justify-content:center;gap:8px;">
+            <span class="cal-dot" style="background:${col};width:16px;height:16px;"></span>
+            <strong>${escapeHtml(acts[idx])}</strong>
+          </div>`;
+        res.classList.remove('pop'); void res.offsetWidth; res.classList.add('pop');
+        SFX.chime();
+        notifyPet();
+      }
+    }
+    requestAnimationFrame(frame);
+  }
+  $('#spinBtn', root).addEventListener('click', spin);
+
+  function drawList() {
+    const acts = getActs();
+    const el = $('#actList', root);
+    el.innerHTML = '';
+    acts.forEach((a, i) => {
+      const div = document.createElement('div'); div.className='list-item';
+      div.innerHTML = `<span class="cal-dot" style="background:${WHEEL_COLORS[i%WHEEL_COLORS.length]};width:14px;height:14px;"></span>
+        <div class="grow">${escapeHtml(a)}</div><button class="del">✕</button>`;
+      div.querySelector('.del').addEventListener('click', () => { const arr=getActs(); arr.splice(i,1); saveActs(arr); drawList(); drawWheel(); });
+      el.appendChild(div);
+    });
+  }
+  function addAct() {
+    const inp = $('#actInput', root); const v = inp.value.trim(); if (!v) return;
+    const arr = getActs(); arr.push(v); saveActs(arr); inp.value=''; drawList(); drawWheel();
+  }
+  $('#actAdd', root).addEventListener('click', addAct);
+  $('#actInput', root).addEventListener('keydown', e => { if(e.key==='Enter') addAct(); });
+
+  drawWheel(); drawList();
 }
 
 /* =========================================================
