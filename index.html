@@ -231,6 +231,25 @@
     flex-shrink: 0;
   }
   .back-btn:active { transform: scale(0.9); }
+  .info-btn {
+    background: var(--panel-solid); border: 1px solid var(--border); color: var(--text);
+    width: 32px; height: 32px; border-radius: 50%; flex-shrink:0; cursor:pointer;
+    font-style: italic; font-weight: 700; font-family: Georgia, serif; font-size: 1rem;
+  }
+  .info-btn:active { transform: scale(0.9); }
+  .modal-overlay {
+    position: fixed; inset: 0; z-index: 200; display:flex; align-items:center; justify-content:center;
+    background: rgba(0,0,0,0.5); padding: 20px; opacity:0; transition: opacity 0.2s;
+  }
+  .modal-overlay.open { opacity: 1; }
+  .modal-card {
+    background: var(--panel-solid); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 20px; max-width: 460px; width: 100%; box-shadow: var(--shadow); max-height: 80vh; overflow-y: auto;
+    transform: scale(0.95); transition: transform 0.2s;
+  }
+  .modal-overlay.open .modal-card { transform: scale(1); }
+  .modal-card h3 { margin: 0 0 12px; font-size: 1.1rem; }
+  .modal-body { font-size: 0.9rem; line-height: 1.5; color: var(--text); }
   .screen-head h2 { margin: 0; font-size: 1.1rem; display:flex; align-items:center; gap:10px; }
   .screen-head .pixel-icon { width: 32px; height: 32px; }
   .screen-body {
@@ -1643,6 +1662,16 @@ const I18N = {
     type_birthday:'Compleanno', type_event:'Evento',
     months:['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'],
     weekdays_short:['Lun','Mar','Mer','Gio','Ven','Sab','Dom'],
+    // info modal
+    info_title:'Come funziona', info_close:'Ho capito',
+    help_todo:'Organizza le tue attività e la giornata.\n\n• Scheda "Attività": scrivi un impegno e premi + per aggiungerlo. Tocca il quadratino per segnarlo come fatto, la ✕ per eliminarlo.\n• Scheda "Agenda": pianifica la giornata per fasce orarie, scrivendo cosa fare in ciascuna.\nTutto si salva da solo sul dispositivo.',
+    help_workout:'Crea la tua routine di allenamento settimanale.\n\n• Scegli il giorno della settimana in alto.\n• Aggiungi un esercizio con serie, ripetizioni e (facoltativo) i kg.\n• La ✕ elimina un esercizio.\nOgni giorno ha la sua lista, salvata automaticamente.',
+    help_breath:'Esercizi di respirazione guidata per rilassarti o ricaricarti.\n\n• Scegli una tecnica in base al beneficio (Calma & Focus, Sonno, ecc.).\n• Premi "Inizia" e segui il cerchio: si espande quando inspiri, si contrae quando espiri.\n• "Ferma" per interrompere.\nSono esercizi di rilassamento, non un trattamento medico.',
+    help_mood:'Tieni traccia del tuo umore e datti degli obiettivi.\n\n• Scheda "Umore e Obiettivi": tocca la faccina di come ti senti oggi; imposta fino a 3 obiettivi settimanali e spuntali; guarda lo storico degli ultimi giorni.\n• Scheda "Mood-Booster": gira la ruota per farti suggerire un\'attività che ti tira su di morale (puoi personalizzare le attività).',
+    help_shop:'Gestisci più liste della spesa, una per supermercato.\n\n• Crea una lista dando un nome (es. il supermercato).\n• Aprila e aggiungi gli articoli; tocca il quadratino quando li prendi.\n• "Rimuovi presi" pulisce quelli già spuntati.',
+    help_expense:'Tieni sotto controllo le tue spese.\n\n• Aggiungi una spesa con importo, valuta, categoria e nota.\n• Imposta dei tetti (giornaliero/settimanale/mensile/annuale): quando li superi, gli indicatori e le barre del grafico diventano rossi.\n• Il grafico mostra le spese degli ultimi 14 giorni.',
+    help_calendar:'Un calendario per scadenze, pagamenti, compleanni ed eventi.\n\n• Tocca un giorno per aggiungere un evento: titolo, tipo, colore e ripetizione (settimanale/mensile/annuale).\n• Scadenze e pagamenti si possono spuntare come "fatti/pagati".\n• I pallini colorati sui giorni indicano gli eventi; sotto vedi quelli "in arrivo".',
+    help_notes:'Prendi note, anche protette da password.\n\n• "+ Nuova nota" per una nota normale (si salva mentre scrivi).\n• "Nuova nota protetta" 🔒 per cifrarla con una password: senza la password il testo è illeggibile e non recuperabile.\n• "Salva nota" salva e torna alla lista.',
   },
   en: {
     appTitle: 'CrudoLife Tracker',
@@ -1719,6 +1748,16 @@ const I18N = {
     type_birthday:'Birthday', type_event:'Event',
     months:['January','February','March','April','May','June','July','August','September','October','November','December'],
     weekdays_short:['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],
+    // info modal
+    info_title:'How it works', info_close:'Got it',
+    help_todo:'Organize your tasks and your day.\n\n• "Tasks" tab: type a task and press + to add it. Tap the checkbox to mark it done, the ✕ to delete it.\n• "Planner" tab: plan your day by time slots, writing what to do in each.\nEverything saves automatically on your device.',
+    help_workout:'Build your weekly workout routine.\n\n• Pick the weekday at the top.\n• Add an exercise with sets, reps and (optional) kg.\n• The ✕ removes an exercise.\nEach day has its own list, saved automatically.',
+    help_breath:'Guided breathing exercises to relax or recharge.\n\n• Pick a technique by its benefit (Calm & Focus, Sleep, etc.).\n• Press "Start" and follow the circle: it expands as you inhale, shrinks as you exhale.\n• "Stop" to end.\nThese are relaxation exercises, not medical treatment.',
+    help_mood:'Track your mood and set goals.\n\n• "Mood & Goals" tab: tap how you feel today; set up to 3 weekly goals and check them off; see your recent history.\n• "Mood-Booster" tab: spin the wheel to get an activity that lifts your mood (activities are customizable).',
+    help_shop:'Manage multiple shopping lists, one per supermarket.\n\n• Create a list by naming it (e.g. the supermarket).\n• Open it and add items; tap the checkbox when you pick them up.\n• "Remove picked" clears the checked ones.',
+    help_expense:'Keep your spending under control.\n\n• Add an expense with amount, currency, category and note.\n• Set limits (daily/weekly/monthly/yearly): when you go over, the indicators and chart bars turn red.\n• The chart shows the last 14 days of spending.',
+    help_calendar:'A calendar for deadlines, payments, birthdays and events.\n\n• Tap a day to add an event: title, type, color and repeat (weekly/monthly/yearly).\n• Deadlines and payments can be checked off as done/paid.\n• Colored dots on days show events; below you see the upcoming ones.',
+    help_notes:'Take notes, including password-protected ones.\n\n• "+ New note" for a normal note (saves as you type).\n• "New protected note" 🔒 to encrypt it with a password: without the password the text is unreadable and unrecoverable.\n• "Save note" saves and returns to the list.',
   }
 };
 function t(key) { return (I18N[LANG] && I18N[LANG][key] !== undefined) ? I18N[LANG][key] : (I18N.it[key] ?? key); }
@@ -2046,17 +2085,20 @@ function updateGreeting() {
    SCREEN ROUTER
    ========================================================= */
 const screensEl = $('#screens');
-function openScreen(id, buildFn, titleKey, iconName) {
+function openScreen(id, buildFn, titleKey, iconName, helpKey) {
   let el = document.getElementById('screen-'+id);
   if (el) { el.remove(); } // rebuild fresh (keeps language in sync)
   el = document.createElement('div');
   el.className = 'screen';
   el.id = 'screen-'+id;
+  const infoBtn = helpKey ? `<button class="info-btn" aria-label="info">i</button>` : '';
   el.innerHTML = `
     <canvas class="screen-bg"></canvas>
     <div class="screen-head">
       <button class="back-btn" aria-label="${t('back')}">‹</button>
       <h2><span class="icon-slot"></span>${typeof titleKey==='function'?titleKey():t(titleKey)}</h2>
+      <span style="flex:1;"></span>
+      ${infoBtn}
     </div>
     <div class="screen-body"></div>`;
   screensEl.appendChild(el);
@@ -2065,6 +2107,10 @@ function openScreen(id, buildFn, titleKey, iconName) {
   if (typeof BG !== 'undefined' && BG.addTarget) BG.addTarget(scanvas);
   if (iconName && ICONS[iconName]) el.querySelector('.icon-slot').appendChild(drawPixelIcon(iconName, 3));
   el.querySelector('.back-btn').addEventListener('click', () => { if (history.state && history.state.screen) history.back(); else closeScreen(el); });
+  if (helpKey) {
+    const title = typeof titleKey==='function' ? titleKey() : t(titleKey);
+    el.querySelector('.info-btn').addEventListener('click', () => showInfo(title, t(helpKey)));
+  }
   const body = el.querySelector('.screen-body');
   buildFn(body);
   // push a history entry so the hardware back button closes this screen
@@ -2076,6 +2122,24 @@ function closeScreen(el) {
   el.classList.remove('open');
   const scanvas = el.querySelector('.screen-bg');
   if (scanvas && typeof BG !== 'undefined' && BG.removeTarget) BG.removeTarget(scanvas);
+}
+
+// Reusable info/help modal
+function showInfo(title, text) {
+  const existing = document.getElementById('infoModal'); if (existing) existing.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'infoModal'; overlay.className = 'modal-overlay';
+  overlay.innerHTML = `
+    <div class="modal-card">
+      <h3>ℹ️ ${escapeHtml(title)}</h3>
+      <div class="modal-body">${escapeHtml(text).replace(/\n/g,'<br>')}</div>
+      <button class="btn" id="infoClose" style="width:100%; margin-top:14px;">${t('info_close')}</button>
+    </div>`;
+  document.body.appendChild(overlay);
+  const close = () => overlay.remove();
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+  $('#infoClose', overlay).addEventListener('click', close);
+  requestAnimationFrame(() => overlay.classList.add('open'));
 }
 
 /* =========================================================
@@ -2102,7 +2166,7 @@ function renderHome() {
     const name = document.createElement('div'); name.className='name'; name.textContent = t(app.id+'_name');
     const desc = document.createElement('div'); desc.className='desc'; desc.textContent = t(app.id+'_desc');
     el.appendChild(name); el.appendChild(desc);
-    el.addEventListener('click', () => openScreen(app.id, app.build, app.id+'_name', app.icon));
+    el.addEventListener('click', () => openScreen(app.id, app.build, app.id+'_name', app.icon, 'help_'+app.id));
     tiles.appendChild(el);
   });
 }
