@@ -1,0 +1,2847 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#1e1b2e" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="CrudoLife" />
+<meta name="description" content="CrudoLife Tracker — to-do, workout, breathing, mood, shopping, expenses, calendar and secure notes. Offline, bilingual, themed." />
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="apple-touch-icon" href="icon-180.png" />
+<title>CrudoLife Tracker</title>
+<style>
+  :root {
+    --bg: #16131f;
+    --bg2: #1e1b2e;
+    --bg3: #241b33;
+    --panel: rgba(40, 35, 60, 0.72);
+    --panel-solid: #241f36;
+    --accent: #8b7cf6;
+    --accent2: #f472b6;
+    --accent3: #34d399;
+    --accent4: #fbbf24;
+    --text: #ece9f5;
+    --text-dim: #a49fc0;
+    --border: rgba(255,255,255,0.08);
+    --danger: #f87171;
+    --outline: #2a2440;
+    --radius: 18px;
+    --shadow: 0 8px 30px rgba(0,0,0,0.35);
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    height: 100dvh;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: var(--text);
+    background: linear-gradient(160deg, var(--bg) 0%, var(--bg2) 60%, var(--bg3) 100%);
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
+  #bgCanvas {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+    display: block;
+    pointer-events: none;
+  }
+
+  #app {
+    height: 100%;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    max-width: 620px;
+    margin: 0 auto;
+    position: relative;
+    z-index: 1;
+    padding-top: env(safe-area-inset-top);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+
+  /* ---------- Header ---------- */
+  header {
+    padding: 16px 18px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  header h1 {
+    font-size: 1.15rem;
+    margin: 0;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+  }
+  header .greeting {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    margin-top: 2px;
+  }
+
+  /* ---------- Language toggle ---------- */
+  .lang-toggle {
+    display: flex;
+    background: var(--panel-solid);
+    border-radius: 999px;
+    padding: 3px;
+    border: 1px solid rgba(255,255,255,0.08);
+    flex-shrink: 0;
+  }
+  .lang-toggle button {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .lang-toggle button.active {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color: #fff;
+  }
+
+  /* ---------- Theme selector ---------- */
+  .header-controls { display:flex; align-items:center; gap:8px; flex-shrink:0; }
+  .theme-wrap { position:relative; }
+  .theme-btn {
+    background: var(--panel-solid);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 999px;
+    height: 34px; padding: 0 14px;
+    font-size: 0.78rem; font-weight: 700; letter-spacing: 0.4px;
+    color: var(--text); cursor: pointer; line-height:1;
+    display:flex; align-items:center; justify-content:center;
+    white-space: nowrap;
+  }
+  .theme-btn:active { transform: scale(0.92); }
+  .audio-btn { padding: 0 10px; font-size: 1rem; }
+  .audio-btn.on { background: linear-gradient(135deg, var(--accent), var(--accent2)); color:#fff; border-color: transparent; }
+  .theme-menu {
+    position: absolute; top: 42px; right: 0;
+    background: var(--panel-solid);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 14px;
+    box-shadow: var(--shadow);
+    padding: 6px; width: 190px; max-height: 60vh; overflow-y: auto;
+    display: none; z-index: 50;
+  }
+  .theme-menu.open { display: block; }
+  .theme-item {
+    display:flex; align-items:center; gap:10px;
+    padding: 9px 10px; border-radius: 10px; cursor: pointer;
+    font-size: 0.85rem; color: var(--text);
+  }
+  .theme-item:active { transform: scale(0.98); }
+  .theme-item.sel { background: rgba(255,255,255,0.08); font-weight:700; }
+  .theme-swatch {
+    width: 26px; height: 18px; border-radius: 6px; flex-shrink:0;
+    border: 1px solid rgba(255,255,255,0.15);
+  }
+
+  /* ---------- Home grid ---------- */
+  #home {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    padding: 6px 16px calc(90px + env(safe-area-inset-bottom));
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+  }
+  .tile {
+    background: var(--panel);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px 16px;
+    cursor: pointer;
+    transition: transform 0.15s ease, background 0.2s ease;
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-height: 120px;
+  }
+  .tile:active { transform: scale(0.96); }
+  .tile .name { font-weight: 600; font-size: 0.95rem; }
+  .tile .desc { font-size: 0.72rem; color: var(--text-dim); line-height: 1.3; }
+
+  /* ---------- Pixel-art icons ---------- */
+  .pixel-icon {
+    width: 48px;
+    height: 48px;
+    image-rendering: pixelated;
+    filter: drop-shadow(2px 3px 0 rgba(0,0,0,0.25));
+  }
+
+  /* ---------- Screens ---------- */
+  .screen {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(160deg, var(--bg) 0%, var(--bg2) 60%, var(--bg3) 100%);
+    z-index: 5;
+    display: flex;
+    flex-direction: column;
+    transform: translateX(100%);
+    transition: transform 0.28s cubic-bezier(0.4,0,0.2,1);
+    max-width: 620px;
+    margin: 0 auto;
+    padding-top: env(safe-area-inset-top);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+  .screen.open { transform: translateX(0); }
+  .screen-head {
+    padding: 16px 18px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .back-btn {
+    background: var(--panel-solid);
+    border: none;
+    color: var(--text);
+    width: 38px; height: 38px;
+    border-radius: 50%;
+    font-size: 1.2rem;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .back-btn:active { transform: scale(0.9); }
+  .screen-head h2 { margin: 0; font-size: 1.1rem; display:flex; align-items:center; gap:10px; }
+  .screen-head .pixel-icon { width: 32px; height: 32px; }
+  .screen-body {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    padding: 16px 18px calc(40px + env(safe-area-inset-bottom));
+  }
+
+  /* ---------- Common UI ---------- */
+  input, textarea, select {
+    font-family: inherit;
+    font-size: 0.95rem;
+    background: var(--panel-solid);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 12px;
+    padding: 12px 14px;
+    width: 100%;
+    outline: none;
+  }
+  input:focus, textarea:focus, select:focus { border-color: var(--accent); }
+  textarea { resize: vertical; min-height: 90px; }
+  .btn {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color: #fff;
+    border: none;
+    border-radius: 12px;
+    padding: 12px 18px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.12s ease;
+  }
+  .btn:active { transform: scale(0.96); }
+  .btn.secondary { background: var(--panel-solid); border: 1px solid var(--border); color: var(--text); }
+  .btn.danger { background: linear-gradient(135deg, #ef4444, #f87171); }
+  .btn.small { padding: 8px 12px; font-size: 0.8rem; }
+  .row { display: flex; gap: 10px; align-items: center; }
+  .row.wrap { flex-wrap: wrap; }
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 0.8rem; color: var(--text-dim); margin-bottom: 6px; }
+  .list-item {
+    background: var(--panel-solid);
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .list-item .grow { flex: 1; min-width: 0; }
+  .muted { color: var(--text-dim); font-size: 0.82rem; }
+  .empty { text-align: center; color: var(--text-dim); padding: 30px 10px; font-size: 0.9rem; }
+  .checkbox {
+    width: 24px; height: 24px; border-radius: 7px;
+    border: 2px solid var(--accent);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; flex-shrink: 0; font-size: 0.9rem;
+  }
+  .checkbox.done { background: var(--accent); }
+  .done-text { text-decoration: line-through; color: var(--text-dim); }
+  .del { color: var(--danger); cursor: pointer; font-size: 1.1rem; background:none; border:none; flex-shrink:0; }
+  .section-title { font-size: 0.9rem; font-weight: 700; margin: 18px 0 10px; color: var(--accent); }
+  .pill {
+    display: inline-block; padding: 4px 10px; border-radius: 999px;
+    font-size: 0.72rem; background: var(--panel-solid); color: var(--text-dim);
+  }
+  .card {
+    background: var(--panel-solid);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 14px;
+  }
+  .big-num { font-size: 2.4rem; font-weight: 800; }
+  .progress-track { background: rgba(255,255,255,0.08); border-radius: 999px; height: 14px; overflow: hidden; margin: 8px 0; }
+  .progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2)); transition: width 0.4s ease; }
+
+  /* ---------- Mood ---------- */
+  .mood-picker { display: flex; justify-content: space-between; gap: 8px; margin: 10px 0; }
+  .mood-opt {
+    cursor: pointer; padding: 8px; border-radius: 12px;
+    background: var(--panel-solid); flex: 1; transition: transform 0.12s;
+    border: 2px solid transparent;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .mood-opt canvas { width: 40px; height: 40px; }
+  .mood-opt:active { transform: scale(0.9); }
+  .mood-opt.sel { border-color: var(--accent); background: rgba(139,124,246,0.2); }
+
+  /* ---------- Breathing ---------- */
+  .breath-tech { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin-bottom:6px; }
+  .breath-chip {
+    background: var(--panel-solid); border: 1px solid var(--border); color: var(--text-dim);
+    border-radius: 999px; padding: 8px 12px; font-size: 0.78rem; font-weight: 600; cursor: pointer;
+    transition: transform 0.12s;
+  }
+  .breath-chip:active { transform: scale(0.95); }
+  .breath-chip.sel { background: linear-gradient(135deg, var(--accent), var(--accent2)); color:#fff; border-color: transparent; }
+  .breath-wrap { display:flex; flex-direction:column; align-items:center; justify-content:center; padding: 30px 0; }
+  .breath-circle {
+    width: 180px; height: 180px; border-radius: 50%;
+    background: radial-gradient(circle at 40% 35%, var(--accent), var(--accent2));
+    display:flex; align-items:center; justify-content:center;
+    color:#fff; font-weight:700; font-size:1.1rem; text-align:center;
+    transition: transform 4s ease-in-out, box-shadow 4s ease-in-out;
+    box-shadow: 0 0 40px rgba(139,124,246,0.4);
+  }
+  .breath-circle.inhale { transform: scale(1.35); box-shadow: 0 0 70px rgba(244,114,182,0.6); }
+  .breath-circle.hold { transform: scale(1.35); }
+  .breath-circle.exhale { transform: scale(0.85); }
+
+  /* ---------- Toast ---------- */
+  #toast {
+    position: fixed; bottom: calc(90px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%) translateY(20px);
+    background: var(--panel-solid); color: var(--text); padding: 12px 20px;
+    border-radius: 999px; font-size: 0.85rem; opacity: 0; pointer-events: none;
+    transition: opacity 0.3s, transform 0.3s; z-index: 100; box-shadow: var(--shadow);
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  .segmented { display:flex; background: var(--panel-solid); border-radius: 12px; padding: 4px; gap: 4px; margin-bottom: 14px; }
+  .segmented button { flex:1; background:none; border:none; color: var(--text-dim); padding: 8px; border-radius: 9px; cursor:pointer; font-size:0.82rem; font-weight:600; }
+  .segmented button.active { background: var(--accent); color:#fff; }
+  .wk-days { display:flex; gap:6px; margin-bottom:14px; flex-wrap:wrap; }
+  .wk-day { flex:1; min-width:38px; background: var(--panel-solid); border:1px solid var(--border); color: var(--text-dim); border-radius:10px; padding:8px 4px; font-size:0.78rem; font-weight:700; cursor:pointer; }
+  .wk-day.sel { background: linear-gradient(135deg, var(--accent), var(--accent2)); color:#fff; border-color:transparent; }
+
+  .stat-grid { display:grid; grid-template-columns: repeat(2,1fr); gap:12px; }
+  .stat { background: var(--panel-solid); border-radius: 14px; padding: 14px; }
+  .stat .label { font-size: 0.72rem; color: var(--text-dim); }
+  .stat .value { font-size: 1.3rem; font-weight: 800; margin-top:4px; }
+
+  /* ---------- Calendar ---------- */
+  .cal-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+  .cal-month { font-weight:700; font-size:1rem; }
+  .cal-nav { background:var(--panel-solid); border:none; color:var(--text); width:36px; height:36px; border-radius:10px; font-size:1.2rem; cursor:pointer; }
+  .cal-nav:active { transform:scale(0.9); }
+  .cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:5px; }
+  .cal-wd { text-align:center; font-size:0.68rem; color:var(--text-dim); font-weight:700; padding-bottom:4px; }
+  .cal-cell { background:var(--panel-solid); border-radius:9px; min-height:46px; padding:4px; cursor:pointer; display:flex; flex-direction:column; align-items:center; border:2px solid transparent; transition:transform 0.1s; }
+  .cal-cell:active { transform:scale(0.94); }
+  .cal-cell.empty { background:transparent; cursor:default; }
+  .cal-cell.today { border-color:var(--accent); }
+  .cal-daynum { font-size:0.8rem; font-weight:600; }
+  .cal-dots { display:flex; gap:2px; margin-top:auto; flex-wrap:wrap; justify-content:center; }
+  .cal-dot { width:6px; height:6px; border-radius:50%; display:inline-block; }
+  .cal-grid + .section-title { margin-top:20px; }
+  .color-picker { display:flex; flex-wrap:wrap; gap:8px; }
+  .color-swatch { width:28px; height:28px; border-radius:8px; cursor:pointer; border:2px solid transparent; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.15); transition: transform 0.1s; }
+  .color-swatch:active { transform: scale(0.9); }
+  .color-swatch.sel { border-color: var(--text); }
+</style>
+</head>
+<body>
+<canvas id="bgCanvas"></canvas>
+<div id="app">
+  <header>
+    <div>
+      <h1 id="appTitle">CrudoLife Tracker</h1>
+      <div class="greeting" id="greeting">Ciao!</div>
+    </div>
+    <div class="header-controls">
+      <div class="lang-toggle" id="langToggle">
+        <button data-lang="it">IT</button>
+        <button data-lang="en">EN</button>
+      </div>
+      <div class="theme-wrap">
+        <button class="theme-btn" id="themeBtn" aria-label="Theme">TEMI</button>
+        <div class="theme-menu" id="themeMenu"></div>
+      </div>
+      <button class="theme-btn audio-btn" id="audioBtn" aria-label="Sound" aria-pressed="false">🔇</button>
+    </div>
+  </header>
+
+  <div id="home">
+    <div class="grid" id="tiles"></div>
+  </div>
+</div>
+
+<div id="screens"></div>
+<div id="toast"></div>
+
+<script>
+/* =========================================================
+   UTILITY & STORAGE
+   ========================================================= */
+const $ = (sel, root=document) => root.querySelector(sel);
+const $$ = (sel, root=document) => [...root.querySelectorAll(sel)];
+
+const store = {
+  get(key, fallback) {
+    try { const v = localStorage.getItem('mia_'+key); return v ? JSON.parse(v) : fallback; }
+    catch(e) { return fallback; }
+  },
+  set(key, val) {
+    try { localStorage.setItem('mia_'+key, JSON.stringify(val)); } catch(e) {}
+  }
+};
+
+function toast(msg) {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._to);
+  t._to = setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+function todayKey(d = new Date()) {
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+
+/* =========================================================
+   THEMES
+   ========================================================= */
+const THEMES = [
+  { id:'night',  name:'Notte viola', nameEn:'Night purple', vars:{
+    '--bg':'#16131f','--bg2':'#1e1b2e','--bg3':'#241b33','--panel':'rgba(40,35,60,0.72)','--panel-solid':'#241f36',
+    '--accent':'#8b7cf6','--accent2':'#f472b6','--text':'#ece9f5','--text-dim':'#a49fc0','--danger':'#f87171','--outline':'#2a2440','--border':'rgba(255,255,255,0.08)' } },
+  { id:'ocean',  name:'Soft ocean', nameEn:'Soft ocean', vars:{
+    '--bg':'#10202a','--bg2':'#123040','--bg3':'#0e2833','--panel':'rgba(20,55,70,0.72)','--panel-solid':'#123543',
+    '--accent':'#5ee7d0','--accent2':'#4aa3f0','--text':'#e6f6f5','--text-dim':'#8fb4bd','--danger':'#f2807d','--outline':'#0a1c24','--border':'rgba(255,255,255,0.08)' } },
+  { id:'gameboy',name:'Game Boy retro', nameEn:'Game Boy retro', vars:{
+    '--bg':'#0f1a0f','--bg2':'#162613','--bg3':'#101c10','--panel':'rgba(30,50,25,0.72)','--panel-solid':'#1a2b16',
+    '--accent':'#9bbc0f','--accent2':'#8bac0f','--text':'#d7e894','--text-dim':'#7f9450','--danger':'#d17d3f','--outline':'#0a120a','--border':'rgba(155,188,15,0.22)' } },
+  { id:'sunset', name:'Sunset', nameEn:'Sunset', vars:{
+    '--bg':'#241826','--bg2':'#312033','--bg3':'#3a2130','--panel':'rgba(60,40,55,0.72)','--panel-solid':'#33223a',
+    '--accent':'#ff9a76','--accent2':'#d789d7','--text':'#f6e9ec','--text-dim':'#c2a3b0','--danger':'#f2757a','--outline':'#2a1826','--border':'rgba(255,255,255,0.08)' } },
+  { id:'forest', name:'Cozy forest', nameEn:'Cozy forest', vars:{
+    '--bg':'#14201a','--bg2':'#1c2c22','--bg3':'#1a281f','--panel':'rgba(30,50,40,0.72)','--panel-solid':'#1e2f25',
+    '--accent':'#a3d9a5','--accent2':'#e8c07d','--text':'#e7f2e6','--text-dim':'#96b09a','--danger':'#e58a72','--outline':'#0f1712','--border':'rgba(255,255,255,0.08)' } },
+  { id:'mochi',  name:'Mochi soft', nameEn:'Mochi soft', vars:{
+    '--bg':'#f4f1ec','--bg2':'#efeae2','--bg3':'#eae4da','--panel':'rgba(255,255,255,0.72)','--panel-solid':'#ffffff',
+    '--accent':'#f4b9b2','--accent2':'#cbb8e0','--text':'#59524a','--text-dim':'#a49b8f','--danger':'#e88a83','--outline':'#d8cfc2','--border':'rgba(0,0,0,0.10)' } },
+  { id:'dreamy', name:'Dreamy night', nameEn:'Dreamy night', vars:{
+    '--bg':'#14162e','--bg2':'#1c1f3d','--bg3':'#222650','--panel':'rgba(35,40,80,0.72)','--panel-solid':'#1e2244',
+    '--accent':'#a5b4fc','--accent2':'#fbc687','--text':'#e9ecff','--text-dim':'#9aa2cf','--danger':'#f4869a','--outline':'#111330','--border':'rgba(255,255,255,0.09)' } },
+  { id:'seabreeze', name:'Sea Breeze', nameEn:'Sea Breeze', vars:{
+    '--bg':'#2a6f97','--bg2':'#468faf','--bg3':'#61a5c2','--panel':'rgba(20,60,80,0.55)','--panel-solid':'#1f5d7a',
+    '--accent':'#a9def9','--accent2':'#ffd6a5','--text':'#f2fbff','--text-dim':'#c2e0ee','--danger':'#ff8a8a','--outline':'#154458','--border':'rgba(255,255,255,0.14)' } },
+  { id:'mountains', name:'Mountains', nameEn:'Mountains', vars:{
+    '--bg':'#cfeaff','--bg2':'#b3d8f2','--bg3':'#dff1ff','--panel':'rgba(255,255,255,0.72)','--panel-solid':'#ffffff',
+    '--accent':'#5b86a8','--accent2':'#8fb8d6','--text':'#2c3e50','--text-dim':'#6c8196','--danger':'#e06a5a','--outline':'#3a5266','--border':'rgba(0,0,0,0.10)' } },
+];
+let THEME = store.get('theme', 'night');
+
+function applyTheme(id) {
+  const th = THEMES.find(x=>x.id===id) || THEMES[0];
+  THEME = th.id; store.set('theme', th.id);
+  const rootStyle = document.documentElement.style;
+  Object.entries(th.vars).forEach(([k,v]) => rootStyle.setProperty(k, v));
+  // theme-color meta for mobile
+  const meta = document.querySelector('meta[name="theme-color"]'); if (meta) meta.setAttribute('content', th.vars['--bg']);
+  redrawAllIcons();
+  if (typeof BG !== 'undefined') BG.setTheme(th);
+  if (typeof AUDIO !== 'undefined') AUDIO.setTheme(th.id);
+}
+function themeName(th){ return LANG==='en' ? th.nameEn : th.name; }
+function buildThemeMenu() {
+  const menu = $('#themeMenu'); if (!menu) return;
+  menu.innerHTML = '';
+  THEMES.forEach(th => {
+    const item = document.createElement('div');
+    item.className = 'theme-item' + (th.id===THEME?' sel':'');
+    const sw = document.createElement('span'); sw.className='theme-swatch';
+    sw.style.background = `linear-gradient(135deg, ${th.vars['--accent']}, ${th.vars['--accent2']})`;
+    const label = document.createElement('span'); label.textContent = themeName(th);
+    item.appendChild(sw); item.appendChild(label);
+    item.addEventListener('click', () => { applyTheme(th.id); buildThemeMenu(); $('#themeMenu').classList.remove('open'); });
+    menu.appendChild(item);
+  });
+}
+// Re-render icons already on screen so their outline picks up the new theme
+function redrawAllIcons() {
+  // Home tiles + open screens rebuild lazily; force home + current mood if visible
+  if (typeof renderHome === 'function') renderHome();
+}
+
+/* =========================================================
+   ANIMATED THEMED BACKGROUND (canvas, offline, lightweight)
+   ========================================================= */
+const BG = (() => {
+  const canvas = document.getElementById('bgCanvas');
+  const ctx = canvas.getContext('2d');
+  let W = 0, H = 0, dpr = 1;
+  let theme = null, sceneId = 'night', parts = [], t0 = 0;
+  let running = false, rafId = null;
+
+  // which scene each theme uses
+  const SCENE = {
+    night:'aurora', dreamy:'dreamy', ocean:'ocean',
+    gameboy:'gameboy', sunset:'sunset', forest:'forest',
+    mochi:'jelly', seabreeze:'seabreeze', mountains:'mountains'
+  };
+
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth; H = window.innerHeight;
+    canvas.width = W * dpr; canvas.height = H * dpr;
+    canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    buildParts();
+  }
+
+  function cssVar(name) { return (theme && theme.vars[name]) || getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+  function rnd(a, b) { return a + Math.random() * (b - a); }
+
+  function count(base) {
+    // scale particle count with screen area, capped for performance
+    const area = (W * H) / (390 * 780);
+    return Math.max(8, Math.min(70, Math.round(base * area)));
+  }
+
+  function buildParts() {
+    parts = [];
+    switch (sceneId) {
+      case 'stars':
+        for (let i = 0; i < count(46); i++) parts.push({ x:rnd(0,W), y:rnd(0,H), s:rnd(1,3), tw:rnd(0,Math.PI*2), sp:rnd(0.6,1.8) });
+        break;
+      case 'aurora': {
+        const stars = [];
+        for (let i = 0; i < count(50); i++) stars.push({ x:rnd(0,W), y:rnd(0,H*0.9), s:rnd(1,3), tw:rnd(0,Math.PI*2), sp:rnd(0.5,1.6) });
+        // constellation: pick a few stars and connect them
+        const nodes = [];
+        for (let i=0;i<6;i++) nodes.push({ x:rnd(W*0.1,W*0.9), y:rnd(H*0.08,H*0.45) });
+        // aurora ribbons
+        const bands = [];
+        for (let b=0;b<3;b++) bands.push({ baseY:H*(0.16+b*0.10), amp:rnd(24,46), len:rnd(180,320), sp:rnd(0.12,0.30), ph:rnd(0,Math.PI*2), thick:rnd(40,80) });
+        parts = { stars, nodes, bands };
+        break; }
+      case 'dreamy': {
+        const stars = [];
+        for (let i = 0; i < count(40); i++) stars.push({ x:rnd(0,W), y:rnd(0,H*0.85), s:rnd(1,3), tw:rnd(0,Math.PI*2), sp:rnd(0.6,1.8) });
+        parts = { stars, shooting:[], nextShoot:rnd(0.2,0.8), moon:{ x:W*0.78, y:H*0.18, r:Math.max(26, Math.min(W,H)*0.07) } };
+        break; }
+      case 'jelly': {
+        const blobs = [];
+        for (let i = 0; i < count(8); i++) {
+          blobs.push({
+            x:rnd(W*0.1,W*0.9), y:rnd(H*0.15,H*0.9),
+            r:rnd(26,52),
+            vx:rnd(-10,10), vy:rnd(-10,10),
+            wob:rnd(0,Math.PI*2), ws:rnd(1.2,2.4),
+            kind:Math.floor(rnd(0,3)),           // color variant
+            blink:rnd(2,6), blinkT:rnd(0,4)
+          });
+        }
+        parts = { blobs };
+        break; }
+      case 'ocean': {
+        const fish = [];
+        for (let i = 0; i < count(9); i++) {
+          const dir = Math.random()<0.5 ? 1 : -1;
+          fish.push({ x:rnd(0,W), y:rnd(H*0.35,H*0.92), s:rnd(9,18), dir, sp:rnd(14,34), ph:rnd(0,Math.PI*2), kind:Math.floor(rnd(0,2)) });
+        }
+        parts = { fish };
+        break; }
+      case 'grid': parts = null; break;
+      case 'sunset':
+        for (let i=0;i<count(10);i++) parts.push({ x:rnd(0,W), y:rnd(H*0.1,H*0.5), s:rnd(20,48), vx:rnd(4,12) });
+        break;
+      case 'forest': {
+        // rows of trees at different depths + falling leaves
+        const trees = [];
+        const rows = 2;
+        for (let r=0; r<rows; r++) {
+          const baseY = H*(0.7 + r*0.16);
+          const scale = 0.7 + r*0.5;
+          let x = rnd(-30,0);
+          while (x < W + 40) {
+            trees.push({ x, baseY, h:rnd(60,110)*scale, w:rnd(26,44)*scale, ph:rnd(0,Math.PI*2), sw:rnd(0.4,0.9), depth:r });
+            x += rnd(40,80)*scale;
+          }
+        }
+        trees.sort((a,b)=>a.depth-b.depth);
+        const leaves = [];
+        for (let i=0;i<count(16);i++) leaves.push({ x:rnd(0,W), y:rnd(H*0.55,H), s:rnd(4,8), vy:rnd(10,26), vx:rnd(-8,8), ph:rnd(0,Math.PI*2) });
+        parts = { trees, leaves };
+        break; }
+      case 'bubbles':
+        for (let i = 0; i < count(20); i++) parts.push({ x:rnd(0,W), y:rnd(0,H), s:rnd(6,16), vy:rnd(-16,-6), ph:rnd(0,Math.PI*2), kind:Math.floor(rnd(0,3)) });
+        break;
+      case 'gameboy': {
+        // wandering tamagotchi-like creatures + subtle retro grid handled in draw
+        const pets = [];
+        const n = Math.max(3, Math.min(7, Math.round(W/120)));
+        for (let i=0;i<n;i++) {
+          pets.push({
+            x:rnd(20,W-20), y:rnd(H*0.2,H*0.9),
+            dir: Math.random()<0.5?1:-1,
+            sp: rnd(10,26),
+            bob: rnd(0,Math.PI*2),
+            kind: Math.floor(rnd(0,3)),         // 0 blob, 1 bird-ish, 2 bunny-ish
+            step: rnd(4,9),                     // animation speed
+            turnT: rnd(1,3)
+          });
+        }
+        parts = { pets };
+        break; }
+      case 'seabreeze': {
+        // sea view: sun, gulls, a little boat, waves done procedurally
+        const gulls = [];
+        for (let i=0;i<count(6);i++) gulls.push({ x:rnd(0,W), y:rnd(H*0.12,H*0.4), sp:rnd(10,22), dir:Math.random()<0.5?1:-1, ph:rnd(0,Math.PI*2), s:rnd(6,11) });
+        const boat = { x:rnd(W*0.2,W*0.8), y:0, sp:rnd(6,12), dir:Math.random()<0.5?1:-1 };
+        parts = { gulls, boat, sunX:W*0.72, sunY:H*0.24 };
+        break; }
+      case 'mountains': {
+        // parallax mountain ranges (far -> near), snow caps, clouds, birds
+        const ranges = [];
+        const layers = 3;
+        for (let L=0; L<layers; L++) {
+          const peaks = [];
+          const baseY = H*(0.42 + L*0.16);
+          const peakH = H*(0.18 + L*0.10);
+          const seg = W/(4 + L*2);
+          let px = -seg;
+          while (px < W + seg) { peaks.push({ x:px, y: baseY - rnd(peakH*0.5, peakH) }); px += seg*rnd(0.7,1.2); }
+          ranges.push({ peaks, baseY, layer:L });
+        }
+        const clouds = [];
+        for (let i=0;i<count(4);i++) clouds.push({ x:rnd(0,W), y:rnd(H*0.06,H*0.30), s:rnd(30,60), sp:rnd(3,7) });
+        const birds = [];
+        for (let i=0;i<count(4);i++) birds.push({ x:rnd(0,W), y:rnd(H*0.15,H*0.38), sp:rnd(8,16), dir:Math.random()<0.5?1:-1, ph:rnd(0,Math.PI*2), s:rnd(4,7) });
+        parts = { ranges, clouds, birds };
+        break; }
+    }
+  }
+
+  function clearBase() {
+    // paint theme gradient as the base
+    const g = ctx.createLinearGradient(0, 0, W*0.4, H);
+    g.addColorStop(0, cssVar('--bg'));
+    g.addColorStop(0.6, cssVar('--bg2'));
+    g.addColorStop(1, cssVar('--bg3'));
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  }
+
+  function draw(ts) {
+    if (!running) return;
+    const t = (ts - t0) / 1000;
+    clearBase();
+    const acc = cssVar('--accent'), acc2 = cssVar('--accent2'), txt = cssVar('--text');
+
+    switch (sceneId) {
+      case 'stars': {
+        parts.forEach(p => {
+          const a = 0.35 + 0.45 * (0.5 + 0.5 * Math.sin(t * p.sp + p.tw));
+          ctx.fillStyle = hexA(p.s > 2.2 ? acc2 : txt, a);
+          ctx.fillRect(p.x, p.y, p.s, p.s);
+        });
+        break; }
+      case 'aurora': {
+        // aurora ribbons (soft glowing bands)
+        parts.bands.forEach((bd, idx) => {
+          const col = idx % 2 === 0 ? acc : acc2;
+          const steps = 40;
+          for (let layer = 0; layer < 3; layer++) {
+            ctx.beginPath();
+            const thick = bd.thick * (1 - layer*0.28);
+            for (let i = 0; i <= steps; i++) {
+              const x = (i/steps) * W;
+              const y = bd.baseY + Math.sin((x/bd.len)*Math.PI*2 + t*bd.sp + bd.ph) * bd.amp
+                        + Math.sin((x/(bd.len*0.4)) + t*bd.sp*1.6) * bd.amp*0.3;
+              if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+            }
+            for (let i = steps; i >= 0; i--) {
+              const x = (i/steps) * W;
+              const y = bd.baseY + thick + Math.sin((x/bd.len)*Math.PI*2 + t*bd.sp + bd.ph) * bd.amp
+                        + Math.sin((x/(bd.len*0.4)) + t*bd.sp*1.6) * bd.amp*0.3;
+              ctx.lineTo(x, y);
+            }
+            ctx.closePath();
+            ctx.fillStyle = hexA(col, 0.05 + layer*0.02);
+            ctx.fill();
+          }
+        });
+        // constellation lines + nodes
+        ctx.strokeStyle = hexA(txt, 0.16); ctx.lineWidth = 1;
+        ctx.beginPath();
+        parts.nodes.forEach((n, i) => { if (i === 0) ctx.moveTo(n.x, n.y); else ctx.lineTo(n.x, n.y); });
+        ctx.stroke();
+        parts.nodes.forEach(n => { ctx.fillStyle = hexA(acc2, 0.7); ctx.fillRect(n.x-1.5, n.y-1.5, 3, 3); });
+        // twinkling stars
+        parts.stars.forEach(p => {
+          const a = 0.3 + 0.5 * (0.5 + 0.5 * Math.sin(t * p.sp + p.tw));
+          ctx.fillStyle = hexA(p.s > 2.2 ? acc : txt, a);
+          ctx.fillRect(p.x, p.y, p.s, p.s);
+        });
+        break; }
+      case 'jelly': {
+        parts.blobs.forEach(bl => {
+          // drift with gentle bounce off edges
+          bl.x += bl.vx/60; bl.y += bl.vy/60;
+          if (bl.x < bl.r) { bl.x = bl.r; bl.vx *= -1; }
+          if (bl.x > W-bl.r) { bl.x = W-bl.r; bl.vx *= -1; }
+          if (bl.y < bl.r) { bl.y = bl.r; bl.vy *= -1; }
+          if (bl.y > H-bl.r) { bl.y = H-bl.r; bl.vy *= -1; }
+          // wobble: squash & stretch
+          const wob = Math.sin(t*bl.ws + bl.wob);
+          const rx = bl.r * (1 + wob*0.12);
+          const ry = bl.r * (1 - wob*0.12);
+          const col = bl.kind === 0 ? acc : (bl.kind === 1 ? acc2 : '#ffd9e6');
+          // soft glow
+          const g = ctx.createRadialGradient(bl.x, bl.y, ry*0.4, bl.x, bl.y, ry*1.5);
+          g.addColorStop(0, hexA(col, 0.22)); g.addColorStop(1, hexA(col, 0));
+          ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(bl.x, bl.y, rx*1.5, ry*1.5, 0, 0, Math.PI*2); ctx.fill();
+          // body
+          ctx.fillStyle = hexA(col, 0.42);
+          ctx.beginPath(); ctx.ellipse(bl.x, bl.y, rx, ry, 0, 0, Math.PI*2); ctx.fill();
+          // highlight
+          ctx.fillStyle = hexA('#ffffff', 0.35);
+          ctx.beginPath(); ctx.ellipse(bl.x - rx*0.32, bl.y - ry*0.36, rx*0.22, ry*0.16, 0, 0, Math.PI*2); ctx.fill();
+          // cute face — blink cycle
+          bl.blinkT += 1/60; const blinking = (bl.blinkT % bl.blink) < 0.14;
+          ctx.fillStyle = hexA('#4a4055', 0.7);
+          const eoff = rx*0.28, ey = bl.y - ry*0.05;
+          if (blinking) {
+            ctx.fillRect(bl.x - eoff - 3, ey, 6, 1.6);
+            ctx.fillRect(bl.x + eoff - 3, ey, 6, 1.6);
+          } else {
+            ctx.beginPath(); ctx.arc(bl.x - eoff, ey, 2.4, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.arc(bl.x + eoff, ey, 2.4, 0, Math.PI*2); ctx.fill();
+          }
+          // smile
+          ctx.strokeStyle = hexA('#4a4055', 0.6); ctx.lineWidth = 1.6;
+          ctx.beginPath(); ctx.arc(bl.x, ey + ry*0.18, rx*0.22, 0.15*Math.PI, 0.85*Math.PI); ctx.stroke();
+          // cheeks
+          ctx.fillStyle = hexA('#ff9ec4', 0.4);
+          ctx.beginPath(); ctx.arc(bl.x - eoff - 2, ey + ry*0.18, 2.6, 0, Math.PI*2); ctx.fill();
+          ctx.beginPath(); ctx.arc(bl.x + eoff + 2, ey + ry*0.18, 2.6, 0, Math.PI*2); ctx.fill();
+        });
+        break; }
+      case 'dreamy': {
+        // moon with soft glow
+        const mo = parts.moon;
+        const mg = ctx.createRadialGradient(mo.x, mo.y, mo.r*0.4, mo.x, mo.y, mo.r*2.4);
+        mg.addColorStop(0, hexA(acc2, 0.35)); mg.addColorStop(1, hexA(acc2, 0));
+        ctx.fillStyle = mg; ctx.beginPath(); ctx.arc(mo.x, mo.y, mo.r*2.4, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = hexA('#fff6d8', 0.95); ctx.beginPath(); ctx.arc(mo.x, mo.y, mo.r, 0, Math.PI*2); ctx.fill();
+        // crescent shadow
+        ctx.fillStyle = hexA(cssVar('--bg2'), 1); ctx.beginPath(); ctx.arc(mo.x + mo.r*0.5, mo.y - mo.r*0.25, mo.r*0.92, 0, Math.PI*2); ctx.fill();
+        // craters
+        ctx.fillStyle = hexA('#e6dcbf', 0.5);
+        ctx.beginPath(); ctx.arc(mo.x - mo.r*0.35, mo.y + mo.r*0.1, mo.r*0.16, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(mo.x - mo.r*0.1, mo.y + mo.r*0.4, mo.r*0.1, 0, Math.PI*2); ctx.fill();
+        // twinkling stars
+        parts.stars.forEach(p => {
+          const a = 0.35 + 0.5 * (0.5 + 0.5 * Math.sin(t * p.sp + p.tw));
+          ctx.fillStyle = hexA(p.s > 2.2 ? acc : txt, a);
+          ctx.fillRect(p.x, p.y, p.s, p.s);
+        });
+        // shooting stars (frequent)
+        parts.nextShoot -= 1/60;
+        if (parts.nextShoot <= 0 && parts.shooting.length < 5) {
+          const fromLeft = Math.random() < 0.5;
+          parts.shooting.push({
+            x: fromLeft ? rnd(0, W*0.5) : rnd(W*0.5, W),
+            y: rnd(0, H*0.5),
+            vx: (fromLeft ? 1 : -1) * rnd(170, 300),
+            vy: rnd(110, 210),
+            life:0, max:rnd(0.6,1.0)
+          });
+          parts.nextShoot = rnd(0.35, 1.3);
+        }
+        parts.shooting.forEach(s => {
+          s.life += 1/60; s.x += s.vx/60; s.y += s.vy/60;
+          const p2 = Math.min(1, s.life/s.max);
+          const alpha = Math.sin(p2 * Math.PI); // fade in/out
+          const tailX = s.x - s.vx*0.12, tailY = s.y - s.vy*0.12;
+          const grad = ctx.createLinearGradient(s.x, s.y, tailX, tailY);
+          grad.addColorStop(0, hexA('#ffffff', 0.9*alpha)); grad.addColorStop(1, hexA(acc, 0));
+          ctx.strokeStyle = grad; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(tailX, tailY); ctx.stroke();
+          ctx.fillStyle = hexA('#ffffff', 0.9*alpha); ctx.fillRect(s.x-1, s.y-1, 2.5, 2.5);
+        });
+        parts.shooting = parts.shooting.filter(s => s.life < s.max && s.y < H+40 && s.x > -60 && s.x < W+60);
+        break; }
+      case 'bubbles': {
+        parts.forEach(p => {
+          p.y += p.vy / 60; p.x += Math.sin(t + p.ph) * 0.3;
+          if (p.y < -20) { p.y = H + 20; p.x = rnd(0, W); }
+          const col = p.kind === 0 ? acc : (p.kind === 1 ? acc2 : txt);
+          ctx.fillStyle = hexA(col, 0.16);
+          roundRect(p.x, p.y, p.s, p.s, p.s * 0.4);
+        });
+        break; }
+      case 'ocean': {
+        // layered waves
+        for (let layer = 0; layer < 3; layer++) {
+          const col = layer === 0 ? acc2 : acc;
+          ctx.fillStyle = hexA(col, 0.10 + layer * 0.05);
+          ctx.beginPath();
+          const baseY = H * (0.30 + layer * 0.10);
+          const amp = 10 + layer * 6, len = 220 + layer * 60, sp = 0.4 + layer * 0.25;
+          ctx.moveTo(0, 0);
+          for (let x = 0; x <= W; x += 8) ctx.lineTo(x, baseY + Math.sin((x / len) * Math.PI * 2 + t * sp) * amp);
+          ctx.lineTo(W, 0); ctx.closePath(); ctx.fill();
+        }
+        // rising bubbles
+        ctx.fillStyle = hexA(txt, 0.10);
+        for (let i = 0; i < 22; i++) { const bx = (i * 97 % W); const by = H - ((t * 20 + i * 60) % H); ctx.fillRect(bx, by, 3, 3); }
+        // fish swimming
+        parts.fish.forEach(f => {
+          f.x += (f.sp * f.dir) / 60;
+          const yy = f.y + Math.sin(t * 1.2 + f.ph) * 6;
+          if (f.dir > 0 && f.x - f.s*2 > W) { f.x = -f.s*2; f.y = rnd(H*0.35,H*0.92); }
+          if (f.dir < 0 && f.x + f.s*2 < 0) { f.x = W + f.s*2; f.y = rnd(H*0.35,H*0.92); }
+          drawFish(f.x, yy, f.s, f.dir, f.kind === 0 ? acc : acc2, t, f.ph);
+        });
+        break; }
+      case 'grid': {
+        ctx.strokeStyle = hexA(acc, 0.12); ctx.lineWidth = 1;
+        const gap = 22; const off = (t * 10) % gap;
+        for (let x = -off; x < W; x += gap) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+        for (let y = -off; y < H; y += gap) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+        const sy = (t * 60) % H; ctx.fillStyle = hexA(acc, 0.06); ctx.fillRect(0, sy, W, 40);
+        break; }
+      case 'sunset': {
+        const sunY = H * 0.42;
+        const rg = ctx.createRadialGradient(W*0.5, sunY, 10, W*0.5, sunY, 140);
+        rg.addColorStop(0, hexA(acc2, 0.5)); rg.addColorStop(1, hexA(acc2, 0));
+        ctx.fillStyle = rg; ctx.beginPath(); ctx.arc(W*0.5, sunY, 140, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = hexA(acc, 0.7); ctx.beginPath(); ctx.arc(W*0.5, sunY, 46, 0, Math.PI*2); ctx.fill();
+        parts.forEach(p => { p.x += p.vx / 60; if (p.x - p.s > W) p.x = -p.s*2;
+          ctx.fillStyle = hexA(txt, 0.10); roundRect(p.x, p.y, p.s*2, p.s*0.7, p.s*0.35); });
+        break; }
+      case 'forest': {
+        // swaying trees (drawn back to front), then falling leaves
+        parts.trees.forEach(tr => {
+          const sway = Math.sin(t * tr.sw + tr.ph) * (6 + tr.depth*4);
+          const topX = tr.x + sway, topY = tr.baseY - tr.h;
+          // trunk
+          ctx.strokeStyle = hexA('#6b4a2f', 0.5 + tr.depth*0.15); ctx.lineWidth = Math.max(3, tr.w*0.16);
+          ctx.beginPath(); ctx.moveTo(tr.x, tr.baseY); ctx.quadraticCurveTo(tr.x + sway*0.5, tr.baseY - tr.h*0.5, topX, topY); ctx.stroke();
+          // foliage (3 stacked blobs)
+          const fol = hexA(acc, 0.45 + tr.depth*0.2);
+          ctx.fillStyle = fol;
+          for (let k=0;k<3;k++){
+            const fy = topY + k*tr.h*0.14; const fw = tr.w*(1.1 - k*0.22);
+            ctx.beginPath(); ctx.ellipse(topX, fy, fw, fw*0.8, 0, 0, Math.PI*2); ctx.fill();
+          }
+          ctx.fillStyle = hexA(acc2, 0.25);
+          ctx.beginPath(); ctx.ellipse(topX - tr.w*0.2, topY, tr.w*0.4, tr.w*0.35, 0, 0, Math.PI*2); ctx.fill();
+        });
+        parts.leaves.forEach(p => { p.y -= p.vy / 60; p.x += (p.vx + Math.sin(t + p.ph) * 10) / 60;
+          if (p.y < -12) { p.y = H + 12; p.x = rnd(0, W); }
+          if (p.x < -12) p.x = W + 12; if (p.x > W + 12) p.x = -12;
+          const r = p.s + 1;
+          // translucent bubble body
+          ctx.fillStyle = hexA('#ffffff', 0.10);
+          ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI*2); ctx.fill();
+          // rim
+          ctx.strokeStyle = hexA(acc, 0.35); ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI*2); ctx.stroke();
+          // highlight glint
+          ctx.fillStyle = hexA('#ffffff', 0.5);
+          ctx.beginPath(); ctx.arc(p.x - r*0.35, p.y - r*0.35, r*0.22, 0, Math.PI*2); ctx.fill();
+        });
+        break; }
+      case 'gameboy': {
+        // subtle retro grid + scanline
+        ctx.strokeStyle = hexA(acc, 0.10); ctx.lineWidth = 1;
+        const gap = 22; const off = (t * 8) % gap;
+        for (let x = -off; x < W; x += gap) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+        for (let y = -off; y < H; y += gap) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+        const sy = (t * 50) % H; ctx.fillStyle = hexA(acc, 0.05); ctx.fillRect(0, sy, W, 32);
+        // wandering tamagotchi creatures
+        parts.pets.forEach(p => {
+          p.turnT -= 1/60;
+          if (p.turnT <= 0) { p.dir *= (Math.random()<0.5?-1:1); p.turnT = rnd(1.2, 3.5); }
+          p.x += (p.sp * p.dir)/60;
+          if (p.x < 12) { p.x = 12; p.dir = 1; } if (p.x > W-12) { p.x = W-12; p.dir = -1; }
+          const hop = Math.abs(Math.sin(t * p.step)) * 4; // little hopping
+          drawPet(p.x, p.y - hop, p.dir, p.kind, acc, acc2);
+        });
+        break; }
+      case 'seabreeze': {
+        // sky already from base; sun with glow
+        const sx = parts.sunX, syy = parts.sunY;
+        const rg = ctx.createRadialGradient(sx, syy, 8, sx, syy, 90);
+        rg.addColorStop(0, hexA('#fff2c2', 0.6)); rg.addColorStop(1, hexA('#fff2c2', 0));
+        ctx.fillStyle = rg; ctx.beginPath(); ctx.arc(sx, syy, 90, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = hexA('#ffe9a8', 0.9); ctx.beginPath(); ctx.arc(sx, syy, 30, 0, Math.PI*2); ctx.fill();
+        // sea
+        const seaTop = H*0.5;
+        const sg = ctx.createLinearGradient(0, seaTop, 0, H);
+        sg.addColorStop(0, hexA(acc, 0.30)); sg.addColorStop(1, hexA('#0a3550', 0.55));
+        ctx.fillStyle = sg; ctx.fillRect(0, seaTop, W, H - seaTop);
+        // sun reflection shimmering on the water
+        for (let i=0;i<10;i++){ const ry = seaTop + 8 + i*((H-seaTop)/12); const w = 40 - i*2 + Math.sin(t*2+i)*8;
+          ctx.fillStyle = hexA('#fff2c2', 0.10); ctx.fillRect(sx - w/2, ry, w, 2); }
+        // wave lines
+        for (let layer=0; layer<3; layer++){
+          ctx.strokeStyle = hexA('#ffffff', 0.10 + layer*0.03); ctx.lineWidth = 2;
+          ctx.beginPath();
+          const baseY = seaTop + 20 + layer*((H-seaTop)/4);
+          for (let x=0;x<=W;x+=8){ const y = baseY + Math.sin((x/120)*Math.PI*2 + t*(0.5+layer*0.3))*4; x===0?ctx.moveTo(x,y):ctx.lineTo(x,y);} 
+          ctx.stroke();
+        }
+        // little boat bobbing on the horizon
+        const b = parts.boat; b.x += (b.sp*b.dir)/60; if (b.x<20){b.x=20;b.dir=1;} if (b.x>W-20){b.x=W-20;b.dir=-1;}
+        const by = seaTop + 10 + Math.sin(t*1.5)*3;
+        ctx.fillStyle = hexA('#3a2a20', 0.8);
+        ctx.beginPath(); ctx.moveTo(b.x-14, by); ctx.lineTo(b.x+14, by); ctx.lineTo(b.x+9, by+8); ctx.lineTo(b.x-9, by+8); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = hexA(acc2, 0.9); ctx.beginPath(); ctx.moveTo(b.x, by-18); ctx.lineTo(b.x, by); ctx.lineTo(b.x+12, by-4); ctx.closePath(); ctx.fill();
+        // gulls
+        parts.gulls.forEach(g => {
+          g.x += (g.sp*g.dir)/60; if (g.x<-20)g.x=W+20; if (g.x>W+20)g.x=-20;
+          const flap = Math.sin(t*4 + g.ph)*g.s*0.5;
+          ctx.strokeStyle = hexA('#ffffff', 0.5); ctx.lineWidth = 2; ctx.beginPath();
+          ctx.moveTo(g.x - g.s, g.y - flap*0.4); ctx.quadraticCurveTo(g.x, g.y + flap, g.x + g.s, g.y - flap*0.4); ctx.stroke();
+        });
+        break; }
+      case 'mountains': {
+        // soft sun glow top-left
+        const sx = W*0.24, syy = H*0.18;
+        const rg = ctx.createRadialGradient(sx, syy, 6, sx, syy, 80);
+        rg.addColorStop(0, hexA('#fff6d8', 0.55)); rg.addColorStop(1, hexA('#fff6d8', 0));
+        ctx.fillStyle = rg; ctx.beginPath(); ctx.arc(sx, syy, 80, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = hexA('#fff2c2', 0.85); ctx.beginPath(); ctx.arc(sx, syy, 22, 0, Math.PI*2); ctx.fill();
+
+        // drifting clouds (behind mountains)
+        parts.clouds.forEach(c => { c.x += c.sp/60; if (c.x - c.s > W) c.x = -c.s*2;
+          ctx.fillStyle = hexA('#ffffff', 0.5);
+          ctx.beginPath(); ctx.ellipse(c.x, c.y, c.s, c.s*0.45, 0, 0, Math.PI*2); ctx.fill();
+          ctx.beginPath(); ctx.ellipse(c.x + c.s*0.6, c.y+4, c.s*0.7, c.s*0.38, 0, 0, Math.PI*2); ctx.fill();
+          ctx.beginPath(); ctx.ellipse(c.x - c.s*0.6, c.y+4, c.s*0.6, c.s*0.34, 0, 0, Math.PI*2); ctx.fill();
+        });
+
+        // birds (far, small "v" shapes)
+        parts.birds.forEach(b => {
+          b.x += (b.sp*b.dir)/60; if (b.x<-20) b.x=W+20; if (b.x>W+20) b.x=-20;
+          const flap = Math.sin(t*5 + b.ph)*b.s*0.5;
+          ctx.strokeStyle = hexA('#3a5266', 0.4); ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(b.x - b.s, b.y - flap*0.3);
+          ctx.quadraticCurveTo(b.x, b.y + flap, b.x + b.s, b.y - flap*0.3);
+          ctx.stroke();
+        });
+
+        // parallax mountain ranges (far -> near), lighter far, darker near, with snow caps
+        parts.ranges.forEach(rg2 => {
+          const L = rg2.layer;
+          const shade = 0.22 + L*0.20;                 // near ranges darker
+          const col = L === 0 ? '#9fb8cc' : (L === 1 ? '#6f92ac' : '#4a6a82');
+          // silhouette
+          ctx.fillStyle = hexA(col, shade + 0.35);
+          ctx.beginPath();
+          ctx.moveTo(-20, H);
+          const pk = rg2.peaks;
+          ctx.lineTo(pk[0].x, pk[0].y);
+          for (let i=1;i<pk.length;i++){
+            const midX = (pk[i-1].x + pk[i].x)/2;
+            const valleyY = Math.max(pk[i-1].y, pk[i].y) + (H*0.06);
+            ctx.lineTo(midX, valleyY);
+            ctx.lineTo(pk[i].x, pk[i].y);
+          }
+          ctx.lineTo(W+20, H); ctx.closePath(); ctx.fill();
+          // snow caps on the nearer two ranges
+          if (L >= 1) {
+            ctx.fillStyle = hexA('#ffffff', 0.85);
+            pk.forEach(p => {
+              const capH = (L===2?16:11);
+              ctx.beginPath();
+              ctx.moveTo(p.x, p.y);
+              ctx.lineTo(p.x - capH*0.8, p.y + capH);
+              ctx.lineTo(p.x - capH*0.3, p.y + capH*0.7);
+              ctx.lineTo(p.x + capH*0.2, p.y + capH);
+              ctx.lineTo(p.x + capH*0.7, p.y + capH*0.6);
+              ctx.lineTo(p.x + capH*0.9, p.y + capH);
+              ctx.closePath(); ctx.fill();
+            });
+          }
+        });
+        break; }
+    }
+    rafId = requestAnimationFrame(draw);
+  }
+
+  // small pixel-ish tamagotchi creature
+  function drawPet(x, y, dir, kind, acc, acc2) {
+    ctx.save();
+    ctx.translate(x, y); ctx.scale(dir, 1);
+    const col = kind === 0 ? acc : (kind === 1 ? acc2 : '#d7e894');
+    // body
+    ctx.fillStyle = hexA(col, 0.75);
+    if (kind === 2) { // bunny-ish: taller + ears
+      ctx.fillRect(-6, -10, 12, 14);
+      ctx.fillRect(-5, -18, 3, 8); ctx.fillRect(2, -18, 3, 8);
+    } else if (kind === 1) { // bird-ish: round + beak
+      ctx.beginPath(); ctx.arc(0, -4, 8, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = hexA('#ffb996', 0.9); ctx.fillRect(6, -5, 4, 3);
+    } else { // blob
+      ctx.beginPath(); ctx.arc(0, -3, 8, Math.PI, 0); ctx.fill(); ctx.fillRect(-8, -3, 16, 7);
+    }
+    // outline
+    ctx.strokeStyle = hexA('#0a120a', 0.35); ctx.lineWidth = 1.5;
+    // eyes
+    ctx.fillStyle = hexA('#1a1a1a', 0.8);
+    ctx.fillRect(-3, -6, 2, 2); ctx.fillRect(2, -6, 2, 2);
+    // feet shuffle
+    ctx.fillStyle = hexA(col, 0.9);
+    ctx.fillRect(-5, 4, 3, 2); ctx.fillRect(2, 4, 3, 2);
+    ctx.restore();
+  }
+
+  function drawFish(x, y, s, dir, col, t, ph) {
+    ctx.save();
+    ctx.translate(x, y); ctx.scale(dir, 1);
+    // body
+    ctx.fillStyle = hexA(col, 0.5);
+    ctx.beginPath(); ctx.ellipse(0, 0, s, s*0.55, 0, 0, Math.PI*2); ctx.fill();
+    // tail (wiggles)
+    const wig = Math.sin(t*6 + ph) * s*0.25;
+    ctx.beginPath(); ctx.moveTo(-s*0.8, 0); ctx.lineTo(-s*1.5, -s*0.5 + wig); ctx.lineTo(-s*1.5, s*0.5 + wig); ctx.closePath(); ctx.fill();
+    // eye
+    ctx.fillStyle = hexA('#ffffff', 0.8); ctx.beginPath(); ctx.arc(s*0.45, -s*0.12, s*0.12, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = hexA('#101010', 0.7); ctx.beginPath(); ctx.arc(s*0.48, -s*0.12, s*0.06, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+
+  function roundRect(x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); ctx.fill(); }
+
+  // hex or rgb() color -> rgba string with alpha
+  function hexA(col, a) {
+    col = (col || '#ffffff').trim();
+    let r, g, b;
+    if (col[0] === '#') {
+      const h = col.slice(1);
+      const n = h.length === 3 ? h.split('').map(c=>c+c).join('') : h;
+      r = parseInt(n.slice(0,2),16); g = parseInt(n.slice(2,4),16); b = parseInt(n.slice(4,6),16);
+    } else {
+      const m = col.match(/\d+/g) || [255,255,255]; r=+m[0]; g=+m[1]; b=+m[2];
+    }
+    return `rgba(${r},${g},${b},${a})`;
+  }
+
+  function start() { if (running) return; running = true; t0 = performance.now(); rafId = requestAnimationFrame(draw); }
+  function stop() { running = false; if (rafId) cancelAnimationFrame(rafId); }
+
+  function setTheme(th) {
+    theme = th;
+    sceneId = SCENE[th.id] || 'stars';
+    buildParts();
+  }
+
+  window.addEventListener('resize', resize);
+  document.addEventListener('visibilitychange', () => { document.hidden ? stop() : start(); });
+
+  // init
+  resize();
+  return { setTheme, start, stop, resize };
+})();
+
+/* =========================================================
+   THEMED AMBIENT AUDIO (Web Audio API, synthesized, offline)
+   ========================================================= */
+const AUDIO = (() => {
+  let ctx = null, master = null, nodes = [], timers = [], on = false, curThemeId = 'night', scapeGen = 0;
+
+  // per-theme soundscape descriptor
+  const SCAPES = {
+    // Night Purple: most relaxing pad we can do — 432Hz-tuned low drone
+    night:     { type:'relaxpad', freqs:[108, 162, 216], filter:520, lfo:0.045 },
+    // Dreamy: crickets + faint wind + occasional soft chime/twinkle
+    dreamy:    { type:'dreamy' },
+    // Ocean: NO steady noise — sparse whale calls, faint, plus soft bubbles
+    ocean:     { type:'ocean' },
+    // Sea Breeze: fuller, continuous relaxing waves + faint harbor bell + distant gulls
+    seabreeze: { type:'seabreeze' },
+    // Cozy Forest: no background hiss — layered relaxing bird chirps
+    forest:    { type:'forest' },
+    // Mountains: gentle relaxing tone + occasional bird chirp
+    mountains: { type:'mountains' },
+    // Sunset: warm evening ambience — mellow pad + gentle dusk shimmer + soft evening birds winding down
+    sunset:    { type:'sunset' },
+    mochi:     { type:'bloops' },
+    gameboy:   { type:'chip',  scale:[261.63, 293.66, 329.63, 392, 440] },
+  };
+
+  function ensureCtx() {
+    if (!ctx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return false;
+      ctx = new AC();
+      master = ctx.createGain(); master.gain.value = 0.0; master.connect(ctx.destination);
+    }
+    return true;
+  }
+
+  function clearScape() {
+    scapeGen++;
+    timers.forEach(id => { clearInterval(id); clearTimeout(id); }); timers = [];
+    nodes.forEach(n => { try { n.stop && n.stop(); } catch(e){} try { n.disconnect(); } catch(e){} });
+    nodes = [];
+  }
+
+  function noiseBuffer() {
+    const len = ctx.sampleRate * 2;
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i=0;i<len;i++) d[i] = Math.random()*2 - 1;
+    return buf;
+  }
+
+  function buildScape(id) {
+    if (!ctx) return;
+    clearScape();
+    const sc = SCAPES[id] || SCAPES.night;
+    const g = ctx.createGain(); g.gain.value = 0.6; g.connect(master); nodes.push(g);
+
+    switch (sc.type) {
+      case 'relaxpad': {
+        // very smooth low sine drone, gentle detune + slow filter sweep = deeply relaxing
+        sc.freqs.forEach((f, i) => {
+          const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = f;
+          const o2 = ctx.createOscillator(); o2.type = 'sine'; o2.frequency.value = f * 1.003; // subtle chorus
+          const og = ctx.createGain(); og.gain.value = 0.10 - i*0.015;
+          const lfo = ctx.createOscillator(); lfo.frequency.value = sc.lfo * (1 + i*0.25);
+          const lg = ctx.createGain(); lg.gain.value = 0.04; lfo.connect(lg); lg.connect(og.gain);
+          const filt = ctx.createBiquadFilter(); filt.type='lowpass'; filt.frequency.value = sc.filter;
+          // slow filter breathing
+          const flfo = ctx.createOscillator(); flfo.frequency.value = 0.03; const flg = ctx.createGain(); flg.gain.value = 120;
+          flfo.connect(flg); flg.connect(filt.frequency);
+          o.connect(og); o2.connect(og); og.connect(filt); filt.connect(g);
+          o.start(); o2.start(); lfo.start(); flfo.start();
+          nodes.push(o, o2, og, lfo, lg, filt, flfo, flg);
+        });
+        break;
+      }
+      case 'ocean': {
+        // no steady bed — sparse faint whale calls + soft bubbles
+        scheduleWhales(g);
+        scheduleBubbles(g);
+        break;
+      }
+      case 'seabreeze': {
+        // continuous, fuller waves (two smooth swells layered) + harbor bell + distant gulls
+        makeWaveBed(g, { filter: 650, swellA: 0.10, spA: 0.12, swellB: 0.06, spB: 0.19, base: 0.16 });
+        scheduleHarborBell(g);
+        scheduleGulls(g);
+        break;
+      }
+      case 'forest': {
+        // only relaxing bird chirps — forest species, no background bed
+        scheduleForestBirds(g, 1600, 0.9, true, BIRDS_FOREST);
+        break;
+      }
+      case 'mountains': {
+        // only relaxing bird chirps — mountain species
+        scheduleForestBirds(g, 2200, 0.9, true, BIRDS_MOUNTAIN);
+        break;
+      }
+      case 'dreamy': {
+        // alternating cricket bursts + faint breeze + nocturnal animals + occasional twinkle
+        scheduleCricketBursts(g);
+        makeBreeze(g, 0.03);
+        scheduleNightAnimals(g);
+        scheduleChimes(g, [523.25, 659.25, 783.99, 1046.5], 5200);
+        break;
+      }
+      case 'sunset': {
+        // countryside at dusk: warm gentle breeze + distant alternating crickets + last few birds
+        makeBreeze(g, 0.035);          // soft warm wind
+        scheduleCricketBursts(g);      // distant crickets, come and go
+        scheduleForestBirds(g, 7000, 0.45, false, BIRDS_SUNSET);  // sparse last birds settling for the night
+        break;
+      }
+      case 'bloops': scheduleBloops(g); break;
+      case 'chip': scheduleChip(g, sc.scale); break;
+    }
+  }
+
+  // ---- continuous wave bed (smooth, not choppy) ----
+  function makeWaveBed(dest, opt) {
+    const src = ctx.createBufferSource(); src.buffer = noiseBuffer(); src.loop = true;
+    const filt = ctx.createBiquadFilter(); filt.type='lowpass'; filt.frequency.value = opt.filter;
+    const ng = ctx.createGain(); ng.gain.value = 0.0;
+    const base = ctx.createConstantSource(); base.offset.value = opt.base; base.connect(ng.gain); base.start();
+    // two overlapping slow swells => continuous, never fully silent
+    const lfoA = ctx.createOscillator(); lfoA.type='sine'; lfoA.frequency.value = opt.spA;
+    const lgA = ctx.createGain(); lgA.gain.value = opt.swellA; lfoA.connect(lgA); lgA.connect(ng.gain);
+    const lfoB = ctx.createOscillator(); lfoB.type='sine'; lfoB.frequency.value = opt.spB;
+    const lgB = ctx.createGain(); lgB.gain.value = opt.swellB; lfoB.connect(lgB); lgB.connect(ng.gain);
+    // gentle filter movement for a rolling feel
+    const flfo = ctx.createOscillator(); flfo.frequency.value = opt.spA*0.5; const flg = ctx.createGain(); flg.gain.value = 120;
+    flfo.connect(flg); flg.connect(filt.frequency);
+    src.connect(filt); filt.connect(ng); ng.connect(dest);
+    src.start(); lfoA.start(); lfoB.start(); flfo.start();
+    nodes.push(src, filt, ng, base, lfoA, lgA, lfoB, lgB, flfo, flg);
+  }
+
+  // ---- faint breeze (soft filtered noise, gentle gusts) ----
+  function makeBreeze(dest, level) {
+    const src = ctx.createBufferSource(); src.buffer = noiseBuffer(); src.loop = true;
+    const filt = ctx.createBiquadFilter(); filt.type='lowpass'; filt.frequency.value = 700;
+    const ng = ctx.createGain(); ng.gain.value = 0.0;
+    const base = ctx.createConstantSource(); base.offset.value = level; base.connect(ng.gain); base.start();
+    const lfo = ctx.createOscillator(); lfo.frequency.value = 0.08; const lg = ctx.createGain(); lg.gain.value = level*0.7;
+    lfo.connect(lg); lg.connect(ng.gain);
+    src.connect(filt); filt.connect(ng); ng.connect(dest); src.start(); lfo.start();
+    nodes.push(src, filt, ng, base, lfo, lg);
+  }
+
+  function envBeep(dest, freq, dur, type='sine', peak=0.12) {
+    const o = ctx.createOscillator(); o.type = type; o.frequency.value = freq;
+    const gn = ctx.createGain(); gn.gain.value = 0;
+    o.connect(gn); gn.connect(dest);
+    const now = ctx.currentTime;
+    gn.gain.setValueAtTime(0, now);
+    gn.gain.linearRampToValueAtTime(peak, now + 0.03);
+    gn.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+    o.start(now); o.stop(now + dur + 0.05);
+  }
+
+  // ---- whale call: low sine that slowly bends pitch, very faint ----
+  function whaleCall(dest) {
+    const o = ctx.createOscillator(); o.type='sine';
+    const gn = ctx.createGain(); gn.gain.value = 0;
+    const filt = ctx.createBiquadFilter(); filt.type='lowpass'; filt.frequency.value = 500;
+    o.connect(filt); filt.connect(gn); gn.connect(dest);
+    const now = ctx.currentTime;
+    const f0 = 90 + Math.random()*60;
+    o.frequency.setValueAtTime(f0, now);
+    o.frequency.linearRampToValueAtTime(f0*1.5, now + 1.2);
+    o.frequency.linearRampToValueAtTime(f0*0.8, now + 3.0);
+    gn.gain.setValueAtTime(0, now);
+    gn.gain.linearRampToValueAtTime(0.05, now + 0.8);   // faint
+    gn.gain.linearRampToValueAtTime(0.0001, now + 3.4);
+    o.start(now); o.stop(now + 3.6);
+  }
+  function scheduleWhales(dest) {
+    whaleCall(dest);
+    setTimeout(() => whaleCall(dest), 3000);
+    timers.push(setInterval(() => { if (Math.random()<0.8) { whaleCall(dest); if (Math.random()<0.4) setTimeout(()=>whaleCall(dest), 1500); } }, 5000));
+  }
+
+  // ---- soft bubbles: slower rising blips ----
+  function bubble(dest) {
+    const o = ctx.createOscillator(); o.type='sine';
+    const gn = ctx.createGain(); gn.gain.value = 0;
+    o.connect(gn); gn.connect(dest);
+    const now = ctx.currentTime; const f = 200 + Math.random()*300;   // lower pitch
+    o.frequency.setValueAtTime(f, now);
+    o.frequency.exponentialRampToValueAtTime(f*1.7, now + 0.35);       // slower rise
+    gn.gain.setValueAtTime(0.045, now);
+    gn.gain.exponentialRampToValueAtTime(0.0001, now + 0.4);
+    o.start(now); o.stop(now + 0.45);
+  }
+  function scheduleBubbles(dest) {
+    timers.push(setInterval(() => {
+      if (Math.random()<0.9) {
+        const n = 2 + Math.floor(Math.random()*5); // clusters of 2-6 bubbles
+        for (let i=0;i<n;i++) setTimeout(()=>bubble(dest), i*200); // spaced out => slower feel
+      }
+    }, 1600));
+  }
+
+  // ---- harbor bell: soft metallic ding with long decay ----
+  function harborBell(dest) {
+    const now = ctx.currentTime;
+    [1, 2.01, 2.98].forEach((mult, i) => {
+      const o = ctx.createOscillator(); o.type='sine'; o.frequency.value = 440*mult;
+      const gn = ctx.createGain(); gn.gain.value = 0;
+      o.connect(gn); gn.connect(dest);
+      const peak = 0.05 / (i+1);
+      gn.gain.setValueAtTime(0, now);
+      gn.gain.linearRampToValueAtTime(peak, now + 0.02);
+      gn.gain.exponentialRampToValueAtTime(0.0001, now + 3.2);
+      o.start(now); o.stop(now + 3.4);
+    });
+  }
+  function scheduleHarborBell(dest) {
+    timers.push(setInterval(() => { if (Math.random()<0.4) harborBell(dest); }, 11000));
+  }
+
+  // ---- relaxing bird chirps: multiple "species" with different timbres ----
+  function chirp(dest, base, warble, wave) {
+    const o = ctx.createOscillator(); o.type = wave || 'sine';
+    const gn = ctx.createGain(); gn.gain.value = 0;
+    const filt = ctx.createBiquadFilter(); filt.type='lowpass'; filt.frequency.value = 6000;
+    o.connect(filt); filt.connect(gn); gn.connect(dest);
+    const now = ctx.currentTime;
+    o.frequency.setValueAtTime(base, now);
+    o.frequency.linearRampToValueAtTime(base + warble, now + 0.06);
+    o.frequency.linearRampToValueAtTime(base, now + 0.12);
+    gn.gain.setValueAtTime(0, now);
+    gn.gain.linearRampToValueAtTime(0.05, now + 0.02);
+    gn.gain.exponentialRampToValueAtTime(0.0001, now + 0.16);
+    o.start(now); o.stop(now + 0.2);
+  }
+  // distinct bird "species" sets per environment
+  const BIRDS_FOREST = [
+    { base: 2200, warble: 500, notes: 3, wave:'sine' },    // little trill
+    { base: 1700, warble: -300, notes: 2, wave:'sine' },   // low whistle
+    { base: 2800, warble: 700, notes: 4, wave:'sine' },    // fast tweet
+    { base: 1400, warble: 200, notes: 1, wave:'triangle' },// single soft note
+  ];
+  const BIRDS_MOUNTAIN = [
+    { base: 3200, warble: -600, notes: 2, wave:'sine' },   // high eagle-ish descending
+    { base: 2600, warble: 900, notes: 5, wave:'sine' },    // long rising trill
+    { base: 900,  warble: 120, notes: 1, wave:'triangle' },// deep mountain call
+    { base: 3600, warble: 200, notes: 3, wave:'sine' },    // sparrow chatter
+  ];
+  const BIRDS_SUNSET = [
+    { base: 1200, warble: 300, notes: 2, wave:'triangle' },// mellow dove coo
+    { base: 1900, warble: -400, notes: 3, wave:'sine' },   // evening blackbird
+    { base: 1000, warble: 150, notes: 1, wave:'triangle' },// soft low hoot-ish
+    { base: 2400, warble: -500, notes: 2, wave:'sine' },   // winding-down chirp
+  ];
+  function birdPhrase(dest, species) {
+    const set = species || BIRDS_FOREST;
+    const s = set[Math.floor(Math.random()*set.length)];
+    for (let i=0;i<s.notes;i++) setTimeout(() => chirp(dest, s.base + Math.random()*120, s.warble, s.wave), i*130);
+  }
+  function scheduleForestBirds(dest, everyMs=1600, prob=0.9, dense=true, species=BIRDS_FOREST) {
+    birdPhrase(dest, species);
+    if (dense) setTimeout(() => birdPhrase(dest, species), 700);
+    timers.push(setInterval(() => { if (Math.random()<prob) { birdPhrase(dest, species); if (dense && Math.random()<0.4) setTimeout(()=>birdPhrase(dest, species), 400); } }, everyMs));
+  }
+
+  // ---- crickets in bursts (alternating on/off), not continuous ----
+  function scheduleCricketBursts(dest) {
+    const src = ctx.createBufferSource(); src.buffer = noiseBuffer(); src.loop = true;
+    const filt = ctx.createBiquadFilter(); filt.type='bandpass'; filt.frequency.value = 4800; filt.Q.value = 8;
+    const ng = ctx.createGain(); ng.gain.value = 0.0;      // starts silent
+    const trem = ctx.createOscillator(); trem.type='square'; trem.frequency.value = 18;
+    const tg = ctx.createGain(); tg.gain.value = 0.018; trem.connect(tg); tg.connect(ng.gain);
+    src.connect(filt); filt.connect(ng); ng.connect(dest); src.start(); trem.start();
+    nodes.push(src, filt, ng, trem, tg);
+    // envelope: fade crickets in and out at random intervals
+    const myGen = scapeGen;
+    const cycle = () => {
+      if (!ctx || scapeGen !== myGen) return;
+      const now = ctx.currentTime;
+      const onDur = 4 + Math.random()*4;   // chirp a bit longer
+      const offDur = 1.5 + Math.random()*2.5;  // shorter pauses => more crickets
+      tg.gain.cancelScheduledValues(now);
+      tg.gain.setValueAtTime(tg.gain.value, now);
+      tg.gain.linearRampToValueAtTime(0.028, now + 1.0);  // slightly louder chorus
+      tg.gain.linearRampToValueAtTime(0.0, now + onDur);
+      timers.push(setTimeout(cycle, (onDur + offDur) * 1000));
+    };
+    cycle();
+  }
+
+  // ---- nocturnal animals: soft owl hoots + faint distant calls ----
+  function owlHoot(dest) {
+    const now = ctx.currentTime;
+    const doHoot = (delay) => {
+      const o = ctx.createOscillator(); o.type='sine';
+      const gn = ctx.createGain(); gn.gain.value = 0;
+      const filt = ctx.createBiquadFilter(); filt.type='lowpass'; filt.frequency.value = 500;
+      o.connect(filt); filt.connect(gn); gn.connect(dest);
+      const st = now + delay; const f = 320 + Math.random()*40;
+      o.frequency.setValueAtTime(f, st);
+      o.frequency.linearRampToValueAtTime(f*0.9, st + 0.35);
+      gn.gain.setValueAtTime(0, st);
+      gn.gain.linearRampToValueAtTime(0.05, st + 0.08);
+      gn.gain.exponentialRampToValueAtTime(0.0001, st + 0.5);
+      o.start(st); o.stop(st + 0.6);
+    };
+    doHoot(0); doHoot(0.55); // classic "hoo... hoo"
+  }
+  function scheduleNightAnimals(dest) {
+    timers.push(setInterval(() => {
+      const r = Math.random();
+      if (r < 0.4) owlHoot(dest);
+      else if (r < 0.6) { // faint distant bird/night call
+        const f = 900 + Math.random()*400;
+        envBeep(dest, f, 0.3, 'sine', 0.025);
+      }
+    }, 8000));
+  }
+
+  function scheduleChimes(dest, notes, everyMs) {
+    timers.push(setInterval(() => { if (Math.random()<0.55) envBeep(dest, notes[Math.floor(Math.random()*notes.length)], 2.0, 'sine', 0.05); }, everyMs));
+  }
+  // ---- natural-ish gull cry: filtered triangle with pitch glide + vibrato ----
+  function gullCry(dest) {
+    const now = ctx.currentTime;
+    const notes = 2 + Math.floor(Math.random()*3); // 2-4 descending cries
+    for (let n=0; n<notes; n++) {
+      const st = now + n*0.32;
+      const o = ctx.createOscillator(); o.type='triangle';
+      const filt = ctx.createBiquadFilter(); filt.type='lowpass'; filt.frequency.value = 2200; filt.Q.value = 2;
+      const gn = ctx.createGain(); gn.gain.value = 0;
+      // vibrato for a lively, organic cry
+      const vib = ctx.createOscillator(); vib.type='sine'; vib.frequency.value = 12 + Math.random()*6;
+      const vg = ctx.createGain(); vg.gain.value = 18; vib.connect(vg); vg.connect(o.frequency);
+      o.connect(filt); filt.connect(gn); gn.connect(dest);
+      const f0 = (1200 - n*90) + Math.random()*80;
+      o.frequency.setValueAtTime(f0*0.8, st);
+      o.frequency.linearRampToValueAtTime(f0*1.15, st + 0.06);   // quick rise
+      o.frequency.linearRampToValueAtTime(f0*0.7, st + 0.28);    // then fall
+      gn.gain.setValueAtTime(0, st);
+      gn.gain.linearRampToValueAtTime(0.03, st + 0.04);          // faint/distant
+      gn.gain.exponentialRampToValueAtTime(0.0001, st + 0.3);
+      o.start(st); o.stop(st + 0.34); vib.start(st); vib.stop(st + 0.34);
+    }
+  }
+  function scheduleGulls(dest) {
+    timers.push(setInterval(() => { if (Math.random()<0.4) gullCry(dest); }, 6000));
+  }
+  function scheduleBloops(dest) {
+    timers.push(setInterval(() => { if (Math.random()<0.7) { const f = 300 + Math.random()*300; envBeep(dest, f, 0.4, 'sine', 0.08); } }, 1500));
+  }
+  function scheduleChip(dest, scale) {
+    let i = 0;
+    timers.push(setInterval(() => {
+      const f = scale[i % scale.length]; i++;
+      envBeep(dest, f, 0.18, 'square', 0.05);
+    }, 400));
+  }
+
+  function setTheme(id) {
+    curThemeId = id;
+    if (on && ctx) buildScape(id);
+  }
+  function toggle() {
+    if (!ensureCtx()) return false;
+    on = !on;
+    if (on) {
+      if (ctx.state === 'suspended') ctx.resume();
+      buildScape(curThemeId);
+      master.gain.cancelScheduledValues(ctx.currentTime);
+      master.gain.setValueAtTime(master.gain.value, ctx.currentTime);
+      master.gain.linearRampToValueAtTime(0.5, ctx.currentTime + 0.6);
+    } else {
+      master.gain.cancelScheduledValues(ctx.currentTime);
+      master.gain.setValueAtTime(master.gain.value, ctx.currentTime);
+      master.gain.linearRampToValueAtTime(0.0, ctx.currentTime + 0.4);
+      setTimeout(clearScape, 500);
+    }
+    return on;
+  }
+  function isOn() { return on; }
+  // pause audio when tab hidden
+  document.addEventListener('visibilitychange', () => {
+    if (!ctx || !on) return;
+    if (document.hidden) master.gain.linearRampToValueAtTime(0.0, ctx.currentTime + 0.3);
+    else master.gain.linearRampToValueAtTime(0.5, ctx.currentTime + 0.5);
+  });
+
+  return { setTheme, toggle, isOn };
+})();
+
+/* =========================================================
+   I18N — LANGUAGE SYSTEM
+   ========================================================= */
+let LANG = store.get('lang', (navigator.language||'it').startsWith('en') ? 'en' : 'it');
+
+const I18N = {
+  it: {
+    appTitle: 'CrudoLife Tracker',
+    greetNight: 'Buona notte 🌙',
+    greetMorning: 'Buongiorno ☀️',
+    greetAfternoon: 'Buon pomeriggio 🌤️',
+    greetEvening: 'Buona sera 🌆',
+    back: 'Indietro',
+    themes_label: 'TEMI',
+    // tiles
+    todo_name:'To-do e Agenda', todo_desc:'Attività e giornata per fasce orarie',
+    workout_name:'Allenamento', workout_desc:'Esercizi, serie e ripetizioni',
+    breath_name:'Respirazione', breath_desc:'Esercizi guidati anti-stress',
+    mood_name:'Umore e Obiettivi', mood_desc:'Come ti senti + 3 obiettivi settimana',
+    shop_name:'Lista spesa', shop_desc:'Articoli da comprare',
+    expense_name:'Spese', expense_desc:'Spese per categoria, mese e anno',
+    calendar_name:'Calendario', calendar_desc:'Scadenze, pagamenti, compleanni ed eventi',
+    notes_name:'Note', notes_desc:'Salvataggio auto + note protette',
+    // todo
+    tab_tasks:'Attività', tab_agenda:'Agenda',
+    new_task:'Nuova attività...', todo_empty:'Nessuna attività. Aggiungine una! 📝',
+    agenda_today:'Agenda di oggi', slot_placeholder:'Cosa fai in questa fascia?',
+    slots:['06-09 Mattina presto','09-12 Mattina','12-15 Pranzo','15-18 Pomeriggio','18-21 Sera','21-24 Notte'],
+    // workout
+    exercise:'Esercizio', ex_ph:'Es. Panca piana', sets:'Serie', reps:'Ripetizioni', kg:'Kg (opz.)',
+    add_exercise:'Aggiungi esercizio', workout_today:'Allenamento di oggi',
+    wk_tab_today:'Oggi', wk_tab_routine:'Routine settimanale',
+    wk_routine_empty:'Nessun esercizio per questo giorno',
+    workout_empty:'Nessun esercizio oggi. Forza! 💪', need_ex_name:'Inserisci il nome dell\'esercizio',
+    series_short:'serie', reps_short:'rip',
+    // breath
+    breath_intro:'Scegli una tecnica e segui il cerchio.',
+    ready:'Pronto?', start:'Inizia', stop:'Ferma',
+    b_inhale:'Inspira', b_hold:'Trattieni', b_exhale:'Espira', cycles_done:'Cicli completati: ',
+    breath_disclaimer:'Esercizi di rilassamento, non un trattamento medico. Se ti senti stordito, fermati.',
+    br_focus:'Calma & Focus', br_sleep:'Sonno & Relax', br_balance:'Equilibrio',
+    br_anxiety:'Anti-ansia', br_energy:'Energia & Sveglia', br_deep:'Calma profonda',
+    // mood
+    how_feel:'Come ti senti oggi?', weekly_goals:'🎯 Obiettivi della settimana',
+    last_days:'📅 Ultimi giorni', goal_ph:'Obiettivo',
+    mood_registered:'registrato',
+    mood_sad:'Triste', mood_low:'Giù', mood_neutral:'Neutro', mood_good:'Bene', mood_happy:'Felice',
+    // shop
+    add_item:'Aggiungi articolo...', shop_empty:'Lista vuota 🛒', remove_taken:'Rimuovi presi',
+    shop_lists:'Le tue liste', shop_new_list:'Nuova lista', shop_list_name:'Nome / supermercato',
+    shop_no_lists:'Nessuna lista. Creane una! 🛒', shop_add_list:'Crea lista', shop_need_name:'Inserisci un nome',
+    shop_del_list:'Eliminare questa lista?', shop_items:'articoli',
+    // expense
+    amount:'Importo €', category:'Categoria', note_opt:'Nota (opz.)', note_desc:'Descrizione',
+    add_expense:'Aggiungi spesa', total_month:'Totale mese', total_year:'Totale anno',
+    recent_expenses:'Spese recenti', expense_empty:'Nessuna spesa registrata 💰', valid_amount:'Inserisci un importo valido',
+    cats:['Cibo','Trasporti','Casa','Svago','Salute','Altro'],
+    // notes
+    new_note:'+ Nuova nota', new_note_lock:'Nuova nota protetta', notes_empty:'Nessuna nota 📝',
+    protected_note:'Nota protetta', untitled:'Senza titolo', empty_note:'(vuota)',
+    title_ph:'Titolo', note_ph:'Scrivi qui...', autosave_on:'Salvataggio automatico attivo',
+    typing:'Sto scrivendo...', saved:'✓ Salvato', delete_note:'Eliminare questa nota?',
+    set_pw:'Imposta password', set_pw_desc:'Questa password cifra la nota. Se la dimentichi, il contenuto non è recuperabile.',
+    pw:'Password', pw_repeat:'Ripeti password', create_locked:'Crea nota protetta',
+    pw_short:'Password troppo corta (min 4)', pw_mismatch:'Le password non coincidono',
+    unlock_desc:'Inserisci la password per aprire.', unlock:'Sblocca', wrong_pw:'Password errata',
+    note_not_found:'Nota non trovata', note:'Nota',
+    save_note:'Salva nota',
+    // calendar
+    cal_upcoming:'In arrivo', cal_no_upcoming:'Nessun evento in arrivo',
+    cal_add_event:'Aggiungi evento', cal_new_event:'Nuovo evento',
+    cal_day_empty:'Nessun evento in questo giorno',
+    cal_title_ph:'Titolo evento', cal_note_ph:'Nota / importo (opz.)',
+    cal_type:'Tipo', cal_repeat:'Ripetizione', cal_save:'Salva', cal_color:'Colore',
+    cal_need_title:'Inserisci un titolo',
+    cal_done_pay:'Fatto / Pagato', cal_today:'Oggi',
+    rep_none:'Nessuna', rep_week:'Settimanale', rep_month:'Mensile', rep_year:'Annuale',
+    type_deadline:'Scadenza', type_payment:'Pagamento', type_holiday:'Festività',
+    type_birthday:'Compleanno', type_event:'Evento',
+    months:['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'],
+    weekdays_short:['Lun','Mar','Mer','Gio','Ven','Sab','Dom'],
+  },
+  en: {
+    appTitle: 'CrudoLife Tracker',
+    greetNight: 'Good night 🌙',
+    greetMorning: 'Good morning ☀️',
+    greetAfternoon: 'Good afternoon 🌤️',
+    greetEvening: 'Good evening 🌆',
+    back: 'Back',
+    themes_label: 'THEMES',
+    todo_name:'To-do & Planner', todo_desc:'Tasks and daily time slots',
+    workout_name:'Workout', workout_desc:'Exercises, sets and reps',
+    breath_name:'Breathing', breath_desc:'Guided anti-stress exercises',
+    mood_name:'Mood & Goals', mood_desc:'How you feel + 3 weekly goals',
+    shop_name:'Shopping list', shop_desc:'Items to buy',
+    expense_name:'Expenses', expense_desc:'Spending by category, month & year',
+    calendar_name:'Calendar', calendar_desc:'Deadlines, payments, birthdays & events',
+    notes_name:'Notes', notes_desc:'Auto-save + protected notes',
+    tab_tasks:'Tasks', tab_agenda:'Planner',
+    new_task:'New task...', todo_empty:'No tasks yet. Add one! 📝',
+    agenda_today:'Today\'s plan', slot_placeholder:'What are you doing in this slot?',
+    slots:['06-09 Early morning','09-12 Morning','12-15 Lunch','15-18 Afternoon','18-21 Evening','21-24 Night'],
+    exercise:'Exercise', ex_ph:'e.g. Bench press', sets:'Sets', reps:'Reps', kg:'Kg (opt.)',
+    add_exercise:'Add exercise', workout_today:'Today\'s workout',
+    wk_tab_today:'Today', wk_tab_routine:'Weekly routine',
+    wk_routine_empty:'No exercises for this day',
+    workout_empty:'No exercises today. Let\'s go! 💪', need_ex_name:'Enter the exercise name',
+    series_short:'sets', reps_short:'reps',
+    breath_intro:'Pick a technique and follow the circle.',
+    ready:'Ready?', start:'Start', stop:'Stop',
+    b_inhale:'Inhale', b_hold:'Hold', b_exhale:'Exhale', cycles_done:'Cycles completed: ',
+    breath_disclaimer:'Relaxation exercises, not medical treatment. If you feel dizzy, stop.',
+    br_focus:'Calm & Focus', br_sleep:'Sleep & Relax', br_balance:'Balance',
+    br_anxiety:'Anti-anxiety', br_energy:'Energy & Wake up', br_deep:'Deep calm',
+    how_feel:'How do you feel today?', weekly_goals:'🎯 Goals of the week',
+    last_days:'📅 Last days', goal_ph:'Goal',
+    mood_registered:'saved',
+    mood_sad:'Sad', mood_low:'Down', mood_neutral:'Neutral', mood_good:'Good', mood_happy:'Happy',
+    add_item:'Add item...', shop_empty:'Empty list 🛒', remove_taken:'Remove picked',
+    shop_lists:'Your lists', shop_new_list:'New list', shop_list_name:'Name / supermarket',
+    shop_no_lists:'No lists. Create one! 🛒', shop_add_list:'Create list', shop_need_name:'Enter a name',
+    shop_del_list:'Delete this list?', shop_items:'items',
+    amount:'Amount €', category:'Category', note_opt:'Note (opt.)', note_desc:'Description',
+    add_expense:'Add expense', total_month:'Month total', total_year:'Year total',
+    recent_expenses:'Recent expenses', expense_empty:'No expenses yet 💰', valid_amount:'Enter a valid amount',
+    cats:['Food','Transport','Home','Fun','Health','Other'],
+    new_note:'+ New note', new_note_lock:'New protected note', notes_empty:'No notes 📝',
+    protected_note:'Protected note', untitled:'Untitled', empty_note:'(empty)',
+    title_ph:'Title', note_ph:'Write here...', autosave_on:'Auto-save enabled',
+    typing:'Typing...', saved:'✓ Saved', delete_note:'Delete this note?',
+    set_pw:'Set password', set_pw_desc:'This password encrypts the note. If you forget it, the content cannot be recovered.',
+    pw:'Password', pw_repeat:'Repeat password', create_locked:'Create protected note',
+    pw_short:'Password too short (min 4)', pw_mismatch:'Passwords do not match',
+    unlock_desc:'Enter the password to open.', unlock:'Unlock', wrong_pw:'Wrong password',
+    note_not_found:'Note not found', note:'Note',
+    save_note:'Save note',
+    // calendar
+    cal_upcoming:'Upcoming', cal_no_upcoming:'No upcoming events',
+    cal_add_event:'Add event', cal_new_event:'New event',
+    cal_day_empty:'No events on this day',
+    cal_title_ph:'Event title', cal_note_ph:'Note / amount (opt.)',
+    cal_type:'Type', cal_repeat:'Repeat', cal_save:'Save', cal_color:'Color',
+    cal_need_title:'Enter a title',
+    cal_done_pay:'Done / Paid', cal_today:'Today',
+    rep_none:'None', rep_week:'Weekly', rep_month:'Monthly', rep_year:'Yearly',
+    type_deadline:'Deadline', type_payment:'Payment', type_holiday:'Holiday',
+    type_birthday:'Birthday', type_event:'Event',
+    months:['January','February','March','April','May','June','July','August','September','October','November','December'],
+    weekdays_short:['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],
+  }
+};
+function t(key) { return (I18N[LANG] && I18N[LANG][key] !== undefined) ? I18N[LANG][key] : (I18N.it[key] ?? key); }
+
+function setLang(lang) {
+  LANG = lang;
+  store.set('lang', lang);
+  document.documentElement.lang = lang;
+  applyLangToggle();
+  // Re-render everything currently visible
+  $('#appTitle').textContent = t('appTitle');
+  updateGreeting();
+  renderHome();
+  if (typeof buildThemeMenu === 'function') buildThemeMenu();
+  const tb = $('#themeBtn'); if (tb) tb.textContent = t('themes_label');
+  // Close any open screens so they rebuild in the new language on reopen
+  $$('.screen.open').forEach(s => s.classList.remove('open'));
+}
+function applyLangToggle() {
+  $$('#langToggle button').forEach(b => b.classList.toggle('active', b.dataset.lang === LANG));
+}
+
+/* =========================================================
+   PIXEL-ART ICONS (cute pastel) — drawn on canvas, offline
+   ========================================================= */
+const PASTEL = {
+  '.':null,               // transparent
+  a:'#ffd6e8', b:'#ff9ec4', c:'#b5ead7', d:'#8fd9bd',
+  e:'#c7ceea', f:'#a3b1e6', g:'#fff1b8', h:'#ffe08a',
+  i:'#ffdac1', j:'#ffb996', k:'#e2d1f9', l:'#c4a7f0',
+  m:'#bde0fe', n:'#8ec7f7', o:'#ffffff', p:'#5a4e7c',
+  q:'#ff8fab', r:'#caffbf', s:'#fdffb6', u:'#a0c4ff'
+};
+// 12x12 pixel maps. Each row is exactly 12 chars. '.' = transparent.
+// A dark outline is added automatically by drawPixelIcon() for contrast.
+const ICONS = {
+  todo: [ // clipboard with pink checkmark
+    '....hhhh....',
+    '...hooooh...',
+    '..gggggggg..',
+    '.gddddddddg.',
+    '.gdddddddbg.',
+    '.gddddddbdg.',
+    '.gdbdddbddg.',
+    '.gdbbdbdddg.',
+    '.gddbbbdddg.',
+    '.gddddddddg.',
+    '..gggggggg..',
+    '............'
+  ],
+  workout: [ // dumbbell
+    '............',
+    '............',
+    '.ll......ll.',
+    'lllk....klll',
+    'lllk....klll',
+    'lllkkkkkklll',
+    'lllkkkkkklll',
+    'lllk....klll',
+    'lllk....klll',
+    '.ll......ll.',
+    '............',
+    '............'
+  ],
+  breath: [ // flower with green stem
+    '.....bb.....',
+    '...b.bb.b...',
+    '..bab..bab..',
+    '.baab..baab.',
+    '.baaaggaaab.',
+    '.baaaggaaab.',
+    '..baaggaab..',
+    '...baggab...',
+    '.....gg.....',
+    '....dggd....',
+    '...dd..dd...',
+    '............'
+  ],
+  mood: [ // smiley face
+    '...gggggg...',
+    '..gggggggg..',
+    '.gggggggggg.',
+    'gggggggggggg',
+    'ggpgggggpggg',
+    'ggpgggggpggg',
+    'gggggggggggg',
+    'gpggggggggpg',
+    'gpggggggggpg',
+    '.gpppppppg..',
+    '..gggggggg..',
+    '...gggggg...'
+  ],
+  shop: [ // shopping cart
+    '............',
+    '.ll.........',
+    '.lll........',
+    '...mmmmmmm..',
+    '..muuuuuuum.',
+    '..muuuuuuum.',
+    '..muuuuuuum.',
+    '..mmmmmmmmm.',
+    '............',
+    '...mm..mm...',
+    '...mm..mm...',
+    '............'
+  ],
+  expense: [ // coin with euro mark
+    '...hhhhhh...',
+    '..hggggggh..',
+    '.hgggpppggh.',
+    'hgggpggggggh',
+    'hgggppgggggh',
+    'hgggpggggggh',
+    'hgggpggggggh',
+    'hgggppgggggh',
+    '.hgggpppggh.',
+    '..hggggggh..',
+    '...hhhhhh...',
+    '............'
+  ],
+  notes: [ // notebook page with pencil
+    '.oooooo.....',
+    '.oaaaao.j...',
+    '.oaaaao.jj..',
+    '.oaaaao.jjj.',
+    '.oaaao.jjj..',
+    '.oaaaojjj...',
+    '.oaaaoj.....',
+    '.oaaaao.....',
+    '.oaaaao.....',
+    '.oaaaao.....',
+    '.oooooo.....',
+    '............'
+  ],
+  // ---- Mood faces (pastel yellow, p = dark features) ----
+  mood_sad: [
+    '...gggggg...',
+    '..gggggggg..',
+    '.gggggggggg.',
+    'gggppggppggg',
+    'ggppgggppggg',
+    'gggggggggggg',
+    'gggggggggggg',
+    'ggggppppgggg',
+    'gggpggggpggg',
+    '.gggggggggm.',
+    '..ggggggggm.',
+    '...gggggg...'
+  ],
+  mood_low: [
+    '...gggggg...',
+    '..gggggggg..',
+    '.gggggggggg.',
+    'ggggpggpgggg',
+    'ggggpggpgggg',
+    'gggggggggggg',
+    'gggggggggggg',
+    'gggggggggggg',
+    'gggppppppggg',
+    '.gggggggggg.',
+    '..gggggggg..',
+    '...gggggg...'
+  ],
+  mood_neutral: [
+    '...gggggg...',
+    '..gggggggg..',
+    '.gggggggggg.',
+    'ggggpggpgggg',
+    'ggggpggpgggg',
+    'gggggggggggg',
+    'gggggggggggg',
+    'gggppppppggg',
+    'gggggggggggg',
+    '.gggggggggg.',
+    '..gggggggg..',
+    '...gggggg...'
+  ],
+  mood_good: [
+    '...gggggg...',
+    '..gggggggg..',
+    '.gggggggggg.',
+    'ggggpggpgggg',
+    'ggggpggpgggg',
+    'gggggggggggg',
+    'gggpggggpggg',
+    'gggpggggpggg',
+    'ggggppppgggg',
+    '.gggggggggg.',
+    '..gggggggg..',
+    '...gggggg...'
+  ],
+  mood_happy: [
+    '...gggggg...',
+    '..gggggggg..',
+    '.gggppggppg.',
+    'ggggpggpgggg',
+    'gggggggggggg',
+    'ggpgggggggpg',
+    'ggppppppppgg',
+    'ggpqqqqqqpgg',
+    'gggpqqqqpggg',
+    '.gggppppggg.',
+    '..gggggggg..',
+    '...gggggg...'
+  ],
+  calendar: [ // calendar page with rings and red header
+    '..l....l....',
+    '..l....l....',
+    '.qqqqqqqqqq.',
+    '.qqqqqqqqqq.',
+    '.oaoaoaoaoo.',
+    '.oaeaeaeaao.',
+    '.oaeaeaeaao.',
+    '.oaeaeaeaao.',
+    '.oaaaaaaaao.',
+    '.oooooooooo.',
+    '............',
+    '............'
+  ],
+  lock: [ // padlock: grey shackle + gold body
+    '............',
+    '...pppppp...',
+    '..pp....pp..',
+    '..p......p..',
+    '..p......p..',
+    '.hhhhhhhhhh.',
+    '.hhhhpphhhh.',
+    '.hhhhpphhhh.',
+    '.hhhhpphhhh.',
+    '.hhhhhhhhhh.',
+    '.hhhhhhhhhh.',
+    '............'
+  ],
+};
+
+function drawPixelIcon(mapName, scale=4) {
+  const map = ICONS[mapName];
+  const size = 12;
+  const pad = 1;                 // 1-cell margin so the outline never clips
+  const grid = size + pad*2;     // padded grid
+  const OUTLINE = (getComputedStyle(document.documentElement).getPropertyValue('--outline') || '#2a2440').trim();
+  const canvas = document.createElement('canvas');
+  canvas.width = grid * scale;
+  canvas.height = grid * scale;
+  canvas.className = 'pixel-icon';
+  const ctx = canvas.getContext('2d');
+
+  // filled grid (padded); art is offset by `pad`
+  const filled = [];
+  for (let y=0; y<grid; y++) {
+    filled[y] = [];
+    for (let x=0; x<grid; x++) {
+      const my = y - pad, mx = x - pad;
+      const row = (my>=0 && my<size) ? (map[my]||'').padEnd(size,'.') : '';
+      filled[y][x] = (mx>=0 && mx<size) ? !!PASTEL[row[mx]] : false;
+    }
+  }
+
+  // pass 1: dark outline around every filled pixel (8-dir)
+  ctx.fillStyle = OUTLINE;
+  for (let y=0; y<grid; y++) {
+    for (let x=0; x<grid; x++) {
+      if (filled[y][x]) continue;
+      let touch = false;
+      for (let dy=-1; dy<=1 && !touch; dy++) {
+        for (let dx=-1; dx<=1; dx++) {
+          const ny=y+dy, nx=x+dx;
+          if (ny>=0 && ny<grid && nx>=0 && nx<grid && filled[ny][nx]) { touch=true; break; }
+        }
+      }
+      if (touch) ctx.fillRect(x*scale, y*scale, scale, scale);
+    }
+  }
+
+  // pass 2: colored pixels on top
+  for (let my=0; my<size; my++) {
+    const row = (map[my]||'').padEnd(size,'.');
+    for (let mx=0; mx<size; mx++) {
+      const c = PASTEL[row[mx]];
+      if (c) { ctx.fillStyle = c; ctx.fillRect((mx+pad)*scale, (my+pad)*scale, scale, scale); }
+    }
+  }
+  return canvas;
+}
+
+// Returns an <img> HTML string of a pixel icon (data URL), for inline use in text/buttons.
+function pixelIconImg(name, px=16) {
+  const c = drawPixelIcon(name, 3);
+  return `<img src="${c.toDataURL()}" width="${px}" height="${px}" style="image-rendering:pixelated;vertical-align:-2px;" alt="" />`;
+}
+
+/* =========================================================
+   GREETING (based on time of day)
+   ========================================================= */
+function fmtDate(d = new Date()) {
+  const locale = LANG === 'en' ? 'en-GB' : 'it-IT';
+  return d.toLocaleDateString(locale, { weekday:'long', day:'numeric', month:'long' });
+}
+function updateGreeting() {
+  const h = new Date().getHours();
+  let g;
+  if (h < 6) g = t('greetNight');
+  else if (h < 12) g = t('greetMorning');
+  else if (h < 18) g = t('greetAfternoon');
+  else if (h < 22) g = t('greetEvening');
+  else g = t('greetNight');
+  $('#greeting').textContent = g + ' · ' + fmtDate();
+}
+
+/* =========================================================
+   SCREEN ROUTER
+   ========================================================= */
+const screensEl = $('#screens');
+function openScreen(id, buildFn, titleKey, iconName) {
+  let el = document.getElementById('screen-'+id);
+  if (el) { el.remove(); } // rebuild fresh (keeps language in sync)
+  el = document.createElement('div');
+  el.className = 'screen';
+  el.id = 'screen-'+id;
+  el.innerHTML = `
+    <div class="screen-head">
+      <button class="back-btn" aria-label="${t('back')}">‹</button>
+      <h2><span class="icon-slot"></span>${typeof titleKey==='function'?titleKey():t(titleKey)}</h2>
+    </div>
+    <div class="screen-body"></div>`;
+  screensEl.appendChild(el);
+  if (iconName && ICONS[iconName]) el.querySelector('.icon-slot').appendChild(drawPixelIcon(iconName, 3));
+  el.querySelector('.back-btn').addEventListener('click', () => { if (history.state && history.state.screen) history.back(); else closeScreen(el); });
+  const body = el.querySelector('.screen-body');
+  buildFn(body);
+  // push a history entry so the hardware back button closes this screen
+  history.pushState({ screen: el.id }, '');
+  requestAnimationFrame(() => el.classList.add('open'));
+}
+function closeScreen(el) { if (el) el.classList.remove('open'); }
+
+/* =========================================================
+   APP DEFINITIONS
+   ========================================================= */
+const APPS = [
+  { id:'todo',    icon:'todo',    build: buildTodo },
+  { id:'workout', icon:'workout', build: buildWorkout },
+  { id:'breath',  icon:'breath',  build: buildBreath },
+  { id:'mood',    icon:'mood',    build: buildMood },
+  { id:'shop',    icon:'shop',    build: buildShop },
+  { id:'expense', icon:'expense', build: buildExpense },
+  { id:'calendar',icon:'calendar',build: buildCalendar },
+  { id:'notes',   icon:'notes',   build: buildNotes },
+];
+
+function renderHome() {
+  const tiles = $('#tiles');
+  tiles.innerHTML = '';
+  APPS.forEach(app => {
+    const el = document.createElement('div');
+    el.className = 'tile';
+    el.appendChild(drawPixelIcon(app.icon, 4));
+    const name = document.createElement('div'); name.className='name'; name.textContent = t(app.id+'_name');
+    const desc = document.createElement('div'); desc.className='desc'; desc.textContent = t(app.id+'_desc');
+    el.appendChild(name); el.appendChild(desc);
+    el.addEventListener('click', () => openScreen(app.id, app.build, app.id+'_name', app.icon));
+    tiles.appendChild(el);
+  });
+}
+
+/* =========================================================
+   1. TO-DO & DAILY PLANNER
+   ========================================================= */
+function buildTodo(root) {
+  root.innerHTML = `
+    <div class="segmented" id="todoSeg">
+      <button class="active" data-tab="list">${t('tab_tasks')}</button>
+      <button data-tab="plan">${t('tab_agenda')}</button>
+    </div>
+    <div id="todoContent"></div>`;
+  const seg = $('#todoSeg', root);
+  seg.addEventListener('click', e => {
+    if (e.target.dataset.tab) {
+      $$('button', seg).forEach(b => b.classList.remove('active'));
+      e.target.classList.add('active');
+      e.target.dataset.tab === 'list' ? renderTodoList() : renderPlanner();
+    }
+  });
+  const content = $('#todoContent', root);
+
+  function renderTodoList() {
+    content.innerHTML = `
+      <div class="row" style="margin-bottom:14px;">
+        <input id="todoInput" placeholder="${t('new_task')}" />
+        <button class="btn" id="todoAdd">+</button>
+      </div>
+      <div id="todoList"></div>`;
+    const listEl = $('#todoList', content);
+    function draw() {
+      const list = store.get('todos', []);
+      if (!list.length) { listEl.innerHTML = `<div class="empty">${t('todo_empty')}</div>`; return; }
+      listEl.innerHTML = '';
+      list.forEach(it => {
+        const div = document.createElement('div');
+        div.className = 'list-item';
+        div.innerHTML = `
+          <div class="checkbox ${it.done?'done':''}">${it.done?'✓':''}</div>
+          <div class="grow ${it.done?'done-text':''}">${escapeHtml(it.text)}</div>
+          <button class="del">✕</button>`;
+        div.querySelector('.checkbox').addEventListener('click', () => { it.done=!it.done; store.set('todos', list); draw(); notifyPet(); });
+        div.querySelector('.del').addEventListener('click', () => { store.set('todos', list.filter(x=>x.id!==it.id)); draw(); });
+        listEl.appendChild(div);
+      });
+    }
+    function add() {
+      const inp = $('#todoInput', content); const val = inp.value.trim(); if (!val) return;
+      const list = store.get('todos', []); list.unshift({ id:uid(), text:val, done:false }); store.set('todos', list); inp.value=''; draw();
+    }
+    $('#todoAdd', content).addEventListener('click', add);
+    $('#todoInput', content).addEventListener('keydown', e => { if (e.key==='Enter') add(); });
+    draw();
+  }
+
+  function renderPlanner() {
+    const slots = t('slots');
+    const key = 'plan_' + todayKey();
+    const data = store.get(key, {});
+    content.innerHTML = `<div class="muted" style="margin-bottom:12px;">${t('agenda_today')} · ${fmtDate()}</div>`;
+    slots.forEach((s, i) => {
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.innerHTML = `<div class="section-title" style="margin-top:0;">${s}</div>
+        <textarea data-slot="${i}" placeholder="${t('slot_placeholder')}">${escapeHtml(data[i]||'')}</textarea>`;
+      const ta = card.querySelector('textarea');
+      ta.addEventListener('input', () => { const d = store.get(key, {}); d[i]=ta.value; store.set(key, d); });
+      content.appendChild(card);
+    });
+  }
+  renderTodoList();
+}
+
+/* =========================================================
+   2. WORKOUT TRACKER
+   ========================================================= */
+function buildWorkout(root) {
+  root.innerHTML = `<div id="wkContent"></div>`;
+  const content = $('#wkContent', root);
+
+  function renderRoutine() {
+    const wd = t('weekdays_short'); // Mon..Sun
+    // default selected = today's weekday (Monday-first index)
+    let sel = (new Date().getDay() + 6) % 7;
+    content.innerHTML = `
+      <div class="wk-days" id="wkDays"></div>
+      <div id="wkDayContent"></div>`;
+    const daysWrap = $('#wkDays', content);
+    function drawDays() {
+      daysWrap.innerHTML = '';
+      wd.forEach((d, i) => {
+        const b = document.createElement('button');
+        b.className = 'wk-day' + (i===sel?' sel':'');
+        b.textContent = d;
+        b.addEventListener('click', () => { sel = i; drawDays(); drawDay(); });
+        daysWrap.appendChild(b);
+      });
+    }
+    function drawDay() {
+      // reuse exerciseSection but into a sub-container
+      const sub = $('#wkDayContent', content);
+      const storageKey = 'wkRoutine_' + sel;
+      sub.innerHTML = `
+        <div class="card">
+          <div class="field"><label>${t('exercise')}</label><input id="rName" placeholder="${t('ex_ph')}" /></div>
+          <div class="row">
+            <div class="field grow" style="flex:1;"><label>${t('sets')}</label><input id="rSets" type="number" inputmode="numeric" placeholder="3" /></div>
+            <div class="field grow" style="flex:1;"><label>${t('reps')}</label><input id="rReps" type="number" inputmode="numeric" placeholder="12" /></div>
+            <div class="field grow" style="flex:1;"><label>${t('kg')}</label><input id="rKg" type="number" inputmode="numeric" placeholder="0" /></div>
+          </div>
+          <button class="btn" id="rAdd" style="width:100%;">${t('add_exercise')}</button>
+        </div>
+        <div id="rList"></div>`;
+      function draw() {
+        const list = store.get(storageKey, []);
+        const el = $('#rList', sub);
+        if (!list.length) { el.innerHTML = `<div class="empty">${t('wk_routine_empty')}</div>`; return; }
+        el.innerHTML = '';
+        list.forEach(ex => {
+          const div = document.createElement('div'); div.className='list-item';
+          const kg = ex.kg && ex.kg !== '0' ? ` · ${ex.kg}kg` : '';
+          div.innerHTML = `<div class="grow"><strong>${escapeHtml(ex.name)}</strong><br>
+            <span class="muted">${ex.sets} ${t('series_short')} × ${ex.reps} ${t('reps_short')}${kg}</span></div>
+            <button class="del">✕</button>`;
+          div.querySelector('.del').addEventListener('click', () => { store.set(storageKey, list.filter(x=>x.id!==ex.id)); draw(); });
+          el.appendChild(div);
+        });
+      }
+      $('#rAdd', sub).addEventListener('click', () => {
+        const name = $('#rName', sub).value.trim();
+        if (!name) { toast(t('need_ex_name')); return; }
+        const list = store.get(storageKey, []);
+        list.push({ id:uid(), name, sets:$('#rSets',sub).value||'0', reps:$('#rReps',sub).value||'0', kg:$('#rKg',sub).value||'0' });
+        store.set(storageKey, list);
+        $('#rName',sub).value=''; $('#rSets',sub).value=''; $('#rReps',sub).value=''; $('#rKg',sub).value='';
+        draw();
+      });
+      draw();
+    }
+    drawDays(); drawDay();
+  }
+
+  renderRoutine();
+}
+
+/* =========================================================
+   3. BREATHING
+   ========================================================= */
+const BREATH_TECHNIQUES = [
+  // phases: {k: phase key, s: seconds}. inhale/exhale drive circle scale.
+  { id:'focus',   key:'br_focus',   pattern:'4-4-4-4', phases:[['b_inhale',4],['b_hold',4],['b_exhale',4],['b_hold',4]] },
+  { id:'sleep',   key:'br_sleep',   pattern:'4-7-8',   phases:[['b_inhale',4],['b_hold',7],['b_exhale',8]] },
+  { id:'balance', key:'br_balance', pattern:'5-5',     phases:[['b_inhale',5],['b_exhale',5]] },
+  { id:'anxiety', key:'br_anxiety', pattern:'4-6',     phases:[['b_inhale',4],['b_exhale',6]] },
+  { id:'energy',  key:'br_energy',  pattern:'6-2',     phases:[['b_inhale',6],['b_exhale',2]] },
+  { id:'deep',    key:'br_deep',    pattern:'4-2-6-2', phases:[['b_inhale',4],['b_hold',2],['b_exhale',6],['b_hold',2]] },
+];
+function buildBreath(root) {
+  let current = BREATH_TECHNIQUES[0];
+  root.innerHTML = `
+    <div class="muted" style="text-align:center; margin-bottom:12px;">${t('breath_intro')}</div>
+    <div class="breath-tech" id="bTech"></div>
+    <div class="breath-wrap">
+      <div class="breath-circle" id="bCircle">${t('ready')}</div>
+    </div>
+    <div class="muted" style="text-align:center; margin-top:6px;" id="bPattern"></div>
+    <div class="row" style="justify-content:center; margin-top:10px;">
+      <button class="btn" id="bStart">${t('start')}</button>
+      <button class="btn secondary" id="bStop">${t('stop')}</button>
+    </div>
+    <div class="muted" style="text-align:center; margin-top:14px;" id="bCount"></div>
+    <div class="muted" style="text-align:center; margin-top:18px; font-size:0.72rem; opacity:0.8;">${t('breath_disclaimer')}</div>`;
+
+  const circle = $('#bCircle', root);
+  let running = false, timer = null, cycles = 0, pi = 0;
+
+  const techBox = $('#bTech', root);
+  function renderTech() {
+    techBox.innerHTML = '';
+    BREATH_TECHNIQUES.forEach(tech => {
+      const b = document.createElement('button');
+      b.className = 'breath-chip' + (tech.id===current.id?' sel':'');
+      b.textContent = t(tech.key);
+      b.addEventListener('click', () => { stop(); current = tech; renderTech(); updatePattern(); });
+      techBox.appendChild(b);
+    });
+  }
+  function updatePattern() { $('#bPattern', root).textContent = t(current.key) + ' · ' + current.pattern; }
+
+  function step() {
+    if (!running) return;
+    const [key, secs] = current.phases[pi];
+    const cls = key === 'b_inhale' ? 'inhale' : (key === 'b_exhale' ? 'exhale' : 'hold');
+    circle.className = 'breath-circle ' + cls;
+    // set the CSS transition duration to match the phase length for a smooth ramp
+    circle.style.transition = `transform ${secs}s ease-in-out, box-shadow ${secs}s ease-in-out`;
+    circle.textContent = t(key) + ' · ' + secs;
+    if (pi === 0) { cycles++; $('#bCount', root).textContent = t('cycles_done') + (cycles-1); }
+    pi = (pi + 1) % current.phases.length;
+    timer = setTimeout(step, secs * 1000);
+  }
+  function start() { if (running) return; running = true; pi = 0; cycles = 0; step(); }
+  function stop() { running = false; clearTimeout(timer); circle.className = 'breath-circle'; circle.style.transition=''; circle.textContent = t('ready'); }
+
+  $('#bStart', root).addEventListener('click', start);
+  $('#bStop', root).addEventListener('click', stop);
+  renderTech(); updatePattern();
+
+  const screen = document.getElementById('screen-breath');
+  const obs = new MutationObserver(() => { if (!screen.classList.contains('open')) stop(); });
+  obs.observe(screen, { attributes:true, attributeFilter:['class'] });
+}
+
+/* =========================================================
+   4. MOOD + WEEKLY GOALS
+   ========================================================= */
+const MOOD_DEFS = [
+  { icon:'mood_sad', key:'mood_sad', val:1 },
+  { icon:'mood_low', key:'mood_low', val:2 },
+  { icon:'mood_neutral', key:'mood_neutral', val:3 },
+  { icon:'mood_good', key:'mood_good', val:4 },
+  { icon:'mood_happy', key:'mood_happy', val:5 },
+];
+function buildMood(root) {
+  const key = todayKey();
+  const moods = store.get('moods', {});
+  const todayMood = moods[key];
+  root.innerHTML = `
+    <div class="card">
+      <div class="section-title" style="margin-top:0;">${t('how_feel')}</div>
+      <div class="mood-picker" id="moodPick"></div>
+    </div>
+    <div class="section-title">${t('weekly_goals')}</div>
+    <div id="goals"></div>
+    <div class="section-title">${t('last_days')}</div>
+    <div id="moodHist"></div>`;
+
+  const pick = $('#moodPick', root);
+  MOOD_DEFS.forEach(m => {
+    const d = document.createElement('div');
+    d.className = 'mood-opt' + (todayMood===m.val?' sel':'');
+    d.appendChild(drawPixelIcon(m.icon, 3));
+    d.title = t(m.key);
+    d.addEventListener('click', () => {
+      const mm = store.get('moods', {}); mm[key]=m.val; store.set('moods', mm);
+      $$('.mood-opt', pick).forEach(x => x.classList.remove('sel')); d.classList.add('sel');
+      toast(t(m.key) + ' ' + t('mood_registered')); notifyPet(); drawHist();
+    });
+    pick.appendChild(d);
+  });
+
+  const weekKey = 'goals_' + getWeekKey();
+  function drawGoals() {
+    const goals = store.get(weekKey, [{text:'',done:false},{text:'',done:false},{text:'',done:false}]);
+    const el = $('#goals', root); el.innerHTML='';
+    goals.forEach((g, i) => {
+      const div = document.createElement('div');
+      div.className = 'list-item';
+      div.innerHTML = `
+        <div class="checkbox ${g.done?'done':''}">${g.done?'✓':''}</div>
+        <input class="grow" value="${escapeAttr(g.text)}" placeholder="${t('goal_ph')} ${i+1}..." style="background:transparent;border:none;padding:0;" />`;
+      div.querySelector('.checkbox').addEventListener('click', () => { const gg=store.get(weekKey,goals); gg[i].done=!gg[i].done; store.set(weekKey,gg); drawGoals(); notifyPet(); });
+      div.querySelector('input').addEventListener('input', e => { const gg=store.get(weekKey,goals); gg[i].text=e.target.value; store.set(weekKey,gg); });
+      el.appendChild(div);
+    });
+  }
+  drawGoals();
+
+  function drawHist() {
+    const mm = store.get('moods', {});
+    const el = $('#moodHist', root);
+    const locale = LANG==='en'?'en-GB':'it-IT';
+    el.innerHTML = '';
+    const wrap = document.createElement('div');
+    wrap.className = 'row wrap';
+    for (let i=6; i>=0; i--) {
+      const d = new Date(); d.setDate(d.getDate()-i);
+      const v = mm[todayKey(d)];
+      const day = d.toLocaleDateString(locale,{weekday:'short'});
+      const col = document.createElement('div');
+      col.style.cssText = 'text-align:center;flex:1;';
+      const iconBox = document.createElement('div');
+      iconBox.style.cssText = 'display:flex;justify-content:center;align-items:center;height:34px;';
+      if (v) {
+        const def = MOOD_DEFS.find(m=>m.val===v);
+        iconBox.appendChild(drawPixelIcon(def.icon, 2));
+      } else {
+        iconBox.textContent = '·';
+        iconBox.style.color = 'var(--text-dim)';
+      }
+      const lbl = document.createElement('div');
+      lbl.className = 'muted'; lbl.style.fontSize = '0.7rem'; lbl.textContent = day;
+      col.appendChild(iconBox); col.appendChild(lbl);
+      wrap.appendChild(col);
+    }
+    el.appendChild(wrap);
+  }
+  drawHist();
+}
+function getWeekKey(d=new Date()) {
+  const onejan = new Date(d.getFullYear(),0,1);
+  const week = Math.ceil((((d-onejan)/86400000)+onejan.getDay()+1)/7);
+  return d.getFullYear()+'-w'+week;
+}
+
+/* =========================================================
+   5. SHOPPING LIST
+   ========================================================= */
+function buildShop(root) {
+  // Data model: shopLists = [{ id, name, items:[{id,text,done}] }]
+  function getLists() {
+    let lists = store.get('shopLists', null);
+    if (!lists) {
+      // migrate old single "shop" list if it existed
+      const old = store.get('shop', []);
+      lists = old.length ? [{ id:uid(), name:'🛒', items: old }] : [];
+      store.set('shopLists', lists);
+    }
+    return lists;
+  }
+  function saveLists(l) { store.set('shopLists', l); }
+
+  function drawOverview() {
+    const lists = getLists();
+    root.innerHTML = `
+      <div class="section-title" style="margin-top:0;">${t('shop_lists')}</div>
+      <div class="row" style="margin-bottom:14px;">
+        <input id="newListName" placeholder="${t('shop_list_name')}" />
+        <button class="btn" id="addList">+</button>
+      </div>
+      <div id="listsWrap"></div>`;
+    const wrap = $('#listsWrap', root);
+    if (!lists.length) { wrap.innerHTML = `<div class="empty">${t('shop_no_lists')}</div>`; }
+    else {
+      wrap.innerHTML = '';
+      lists.forEach(L => {
+        const remaining = L.items.filter(i=>!i.done).length;
+        const div = document.createElement('div'); div.className='list-item';
+        div.innerHTML = `<div class="grow"><strong>🛒 ${escapeHtml(L.name)}</strong><br>
+          <span class="muted">${remaining} / ${L.items.length} ${t('shop_items')}</span></div>
+          <button class="del">✕</button>`;
+        div.querySelector('.grow').addEventListener('click', () => openList(L.id));
+        div.querySelector('.del').addEventListener('click', () => {
+          if (confirm(t('shop_del_list'))) { saveLists(getLists().filter(x=>x.id!==L.id)); drawOverview(); }
+        });
+        wrap.appendChild(div);
+      });
+    }
+    function addList() {
+      const inp = $('#newListName', root); const v = inp.value.trim(); if (!v) { toast(t('shop_need_name')); return; }
+      const lists = getLists(); lists.push({ id:uid(), name:v, items:[] }); saveLists(lists); inp.value=''; drawOverview();
+    }
+    $('#addList', root).addEventListener('click', addList);
+    $('#newListName', root).addEventListener('keydown', e => { if(e.key==='Enter') addList(); });
+  }
+
+  function openList(listId) {
+    openScreen('shoplist-'+listId, (b) => shopListEditor(b, listId, drawOverview),
+      () => { const L = getLists().find(x=>x.id===listId); return L ? '🛒 ' + L.name : t('shop_name'); },
+      'shop');
+  }
+
+  drawOverview();
+}
+
+function shopListEditor(body, listId, refreshOverview) {
+  function getList() { return store.get('shopLists', []).find(x=>x.id===listId); }
+  function saveList(L) { const all = store.get('shopLists', []); const i = all.findIndex(x=>x.id===listId); if (i>=0){ all[i]=L; store.set('shopLists', all);} }
+  function render() {
+    const L = getList(); if (!L) { body.innerHTML = ''; return; }
+    body.innerHTML = `
+      <div class="row" style="margin-bottom:14px;">
+        <input id="shopInput" placeholder="${t('add_item')}" />
+        <button class="btn" id="shopAdd">+</button>
+      </div>
+      <div id="shopItems"></div>
+      <button class="btn secondary small" id="shopClear" style="margin-top:10px;">${t('remove_taken')}</button>`;
+    const el = $('#shopItems', body);
+    if (!L.items.length) { el.innerHTML = `<div class="empty">${t('shop_empty')}</div>`; }
+    else {
+      el.innerHTML = '';
+      L.items.forEach(it => {
+        const div = document.createElement('div'); div.className='list-item';
+        div.innerHTML = `
+          <div class="checkbox ${it.done?'done':''}">${it.done?'✓':''}</div>
+          <div class="grow ${it.done?'done-text':''}">${escapeHtml(it.text)}</div>
+          <button class="del">✕</button>`;
+        div.querySelector('.checkbox').addEventListener('click', () => { it.done=!it.done; saveList(L); render(); refreshOverview(); });
+        div.querySelector('.del').addEventListener('click', () => { L.items = L.items.filter(x=>x.id!==it.id); saveList(L); render(); refreshOverview(); });
+        el.appendChild(div);
+      });
+    }
+    function add() {
+      const inp = $('#shopInput', body); const v = inp.value.trim(); if (!v) return;
+      const cur = getList(); cur.items.push({ id:uid(), text:v, done:false }); saveList(cur); inp.value=''; render(); refreshOverview();
+    }
+    $('#shopAdd', body).addEventListener('click', add);
+    $('#shopInput', body).addEventListener('keydown', e => { if(e.key==='Enter') add(); });
+    $('#shopClear', body).addEventListener('click', () => { const cur=getList(); cur.items=cur.items.filter(i=>!i.done); saveList(cur); render(); refreshOverview(); });
+  }
+  render();
+}
+
+/* =========================================================
+   6. EXPENSES
+   ========================================================= */
+function buildExpense(root) {
+  const cats = t('cats');
+  root.innerHTML = `
+    <div class="card">
+      <div class="row">
+        <div class="field grow" style="flex:1;"><label>${t('amount')}</label><input id="eAmt" type="number" inputmode="decimal" placeholder="0.00" /></div>
+        <div class="field grow" style="flex:1;"><label>${t('category')}</label>
+          <select id="eCat">${cats.map((c,i)=>`<option value="${i}">${c}</option>`).join('')}</select>
+        </div>
+      </div>
+      <div class="field"><label>${t('note_opt')}</label><input id="eNote" placeholder="${t('note_desc')}" /></div>
+      <button class="btn" id="eAdd" style="width:100%;">${t('add_expense')}</button>
+    </div>
+    <div class="stat-grid" style="margin:14px 0;">
+      <div class="stat"><div class="label">${t('total_month')}</div><div class="value" id="eMonth">€0</div></div>
+      <div class="stat"><div class="label">${t('total_year')}</div><div class="value" id="eYear">€0</div></div>
+    </div>
+    <div class="section-title">${t('recent_expenses')}</div>
+    <div id="eList"></div>`;
+  function draw() {
+    const list = store.get('expenses', []);
+    const now = new Date();
+    let month=0, year=0;
+    list.forEach(e => {
+      const d = new Date(e.ts);
+      if (d.getFullYear()===now.getFullYear()) { year+=e.amt; if (d.getMonth()===now.getMonth()) month+=e.amt; }
+    });
+    $('#eMonth', root).textContent = '€'+month.toFixed(2);
+    $('#eYear', root).textContent = '€'+year.toFixed(2);
+    const el = $('#eList', root);
+    if (!list.length) { el.innerHTML = `<div class="empty">${t('expense_empty')}</div>`; return; }
+    el.innerHTML = '';
+    const locale = LANG==='en'?'en-GB':'it-IT';
+    list.slice().reverse().slice(0,50).forEach(e => {
+      const div = document.createElement('div');
+      div.className = 'list-item';
+      const d = new Date(e.ts).toLocaleDateString(locale,{day:'numeric',month:'short'});
+      const catName = t('cats')[e.catIdx] ?? e.cat ?? '';
+      div.innerHTML = `<div class="grow"><strong>€${e.amt.toFixed(2)}</strong> <span class="pill">${catName}</span><br>
+        <span class="muted">${d}${e.note?' · '+escapeHtml(e.note):''}</span></div>
+        <button class="del">✕</button>`;
+      div.querySelector('.del').addEventListener('click', () => { store.set('expenses', list.filter(x=>x.id!==e.id)); draw(); });
+      el.appendChild(div);
+    });
+  }
+  $('#eAdd', root).addEventListener('click', () => {
+    const amt = parseFloat($('#eAmt', root).value);
+    if (!amt || amt<=0) { toast(t('valid_amount')); return; }
+    const list = store.get('expenses', []);
+    list.push({ id:uid(), amt, catIdx:parseInt($('#eCat',root).value,10), note:$('#eNote',root).value.trim(), ts:Date.now() });
+    store.set('expenses', list);
+    $('#eAmt',root).value=''; $('#eNote',root).value='';
+    draw();
+  });
+  draw();
+}
+
+/* =========================================================
+   8. CALENDAR & DEADLINES
+   ========================================================= */
+const CAL_TYPES = [
+  { id:'deadline', key:'type_deadline', color:'#ff9ec4', payable:true },
+  { id:'payment',  key:'type_payment',  color:'#8fd9bd', payable:true },
+  { id:'holiday',  key:'type_holiday',  color:'#ffe08a', payable:false },
+  { id:'birthday', key:'type_birthday', color:'#a0c4ff', payable:false },
+  { id:'event',    key:'type_event',    color:'#c4a7f0', payable:false },
+];
+const REPEATS = [
+  { id:'none',  key:'rep_none' },
+  { id:'week',  key:'rep_week' },
+  { id:'month', key:'rep_month' },
+  { id:'year',  key:'rep_year' },
+];
+function calTypeById(id){ return CAL_TYPES.find(x=>x.id===id) || CAL_TYPES[4]; }
+
+// does an event (with its repeat rule) occur on date d?
+function eventOccursOn(ev, d) {
+  const start = new Date(ev.date + 'T00:00:00');
+  if (isNaN(start)) return false;
+  const day = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const s = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+  if (day < s) return false;
+  switch (ev.repeat) {
+    case 'week':  return ((day - s) / 86400000) % 7 === 0;
+    case 'month': return day.getDate() === s.getDate();
+    case 'year':  return day.getDate() === s.getDate() && day.getMonth() === s.getMonth();
+    default:      return day.getTime() === s.getTime();
+  }
+}
+
+function buildCalendar(root) {
+  let view = new Date(); view.setDate(1);
+  root.innerHTML = `
+    <div class="cal-head">
+      <button class="cal-nav" id="calPrev">‹</button>
+      <div class="cal-month" id="calMonth"></div>
+      <button class="cal-nav" id="calNext">›</button>
+    </div>
+    <div class="cal-grid" id="calGridHead"></div>
+    <div class="cal-grid" id="calGrid"></div>
+    <div class="section-title" id="calUpTitle"></div>
+    <div id="calUpcoming"></div>`;
+
+  $('#calPrev', root).addEventListener('click', () => { view.setMonth(view.getMonth()-1); drawMonth(); });
+  $('#calNext', root).addEventListener('click', () => { view.setMonth(view.getMonth()+1); drawMonth(); });
+
+  function drawMonth() {
+    const months = t('months'), wd = t('weekdays_short');
+    $('#calMonth', root).textContent = months[view.getMonth()] + ' ' + view.getFullYear();
+    const head = $('#calGridHead', root); head.innerHTML = '';
+    wd.forEach(w => { const c=document.createElement('div'); c.className='cal-wd'; c.textContent=w; head.appendChild(c); });
+
+    const grid = $('#calGrid', root); grid.innerHTML = '';
+    const first = new Date(view.getFullYear(), view.getMonth(), 1);
+    let startDow = (first.getDay() + 6) % 7; // Monday-first
+    const daysInMonth = new Date(view.getFullYear(), view.getMonth()+1, 0).getDate();
+    const events = store.get('calEvents', []);
+    const today = new Date();
+
+    for (let i=0; i<startDow; i++) { const c=document.createElement('div'); c.className='cal-cell empty'; grid.appendChild(c); }
+    for (let dnum=1; dnum<=daysInMonth; dnum++) {
+      const dateObj = new Date(view.getFullYear(), view.getMonth(), dnum);
+      const cell = document.createElement('div');
+      cell.className = 'cal-cell';
+      const isToday = dateObj.toDateString() === today.toDateString();
+      if (isToday) cell.classList.add('today');
+      const num = document.createElement('div'); num.className='cal-daynum'; num.textContent = dnum;
+      cell.appendChild(num);
+      const dots = document.createElement('div'); dots.className='cal-dots';
+      const dayEvents = events.filter(ev => eventOccursOn(ev, dateObj));
+      [...new Set(dayEvents.map(e=>e.color || calTypeById(e.type).color))].slice(0,4).forEach(colr => {
+        const dot=document.createElement('span'); dot.className='cal-dot'; dot.style.background=colr; dots.appendChild(dot);
+      });
+      cell.appendChild(dots);
+      cell.addEventListener('click', () => openDay(dateObj));
+      grid.appendChild(cell);
+    }
+    drawUpcoming();
+  }
+
+  function drawUpcoming() {
+    $('#calUpTitle', root).textContent = t('cal_upcoming');
+    const el = $('#calUpcoming', root);
+    const events = store.get('calEvents', []);
+    const today = new Date(); today.setHours(0,0,0,0);
+    const horizon = new Date(today); horizon.setDate(horizon.getDate()+60);
+    const occ = [];
+    events.forEach(ev => {
+      for (let d=new Date(today); d<=horizon; d.setDate(d.getDate()+1)) {
+        if (eventOccursOn(ev, d)) { occ.push({ ev, date:new Date(d) }); break; }
+      }
+    });
+    occ.sort((a,b)=>a.date-b.date);
+    if (!occ.length) { el.innerHTML = `<div class="empty">${t('cal_no_upcoming')}</div>`; return; }
+    el.innerHTML = '';
+    const locale = LANG==='en'?'en-GB':'it-IT';
+    occ.slice(0,8).forEach(({ev,date}) => {
+      const type = calTypeById(ev.type);
+      const div = document.createElement('div'); div.className='list-item';
+      const done = ev.done ? 'opacity:0.5;' : '';
+      const dstr = date.toLocaleDateString(locale,{weekday:'short',day:'numeric',month:'short'});
+      div.innerHTML = `
+        <span class="cal-dot" style="background:${type.color};width:14px;height:14px;"></span>
+        <div class="grow" style="${done}"><strong>${escapeHtml(ev.title)}</strong><br>
+          <span class="muted">${dstr} · ${t(type.key)}${ev.note?' · '+escapeHtml(ev.note):''}${ev.done?' ✓':''}</span></div>`;
+      div.querySelector('.grow').addEventListener('click', () => openDay(date));
+      el.appendChild(div);
+    });
+  }
+
+  function openDay(dateObj) {
+    const id = 'calday-' + todayKey(dateObj);
+    openScreen(id, (body) => dayEditor(body, dateObj, drawMonth),
+      () => dateObj.toLocaleDateString(LANG==='en'?'en-GB':'it-IT',{weekday:'long',day:'numeric',month:'long'}),
+      'calendar');
+  }
+
+  drawMonth();
+}
+
+function dayEditor(body, dateObj, refreshMonth) {
+  const dateStr = todayKey(dateObj);
+  const CAL_COLORS = ['#ff9ec4','#8fd9bd','#ffe08a','#a0c4ff','#c4a7f0','#ff9a76','#5ee7d0','#f4b9b2','#a3d9a5','#ffffff'];
+  let pickedColor = null; // null = use type's default color
+  function draw() {
+    const events = store.get('calEvents', []);
+    const dayEvents = events.filter(ev => eventOccursOn(ev, dateObj));
+    body.innerHTML = `
+      <div class="card">
+        <div class="field"><input id="cTitle" placeholder="${t('cal_title_ph')}" /></div>
+        <div class="row">
+          <div class="field grow" style="flex:1;"><label>${t('cal_type')}</label>
+            <select id="cType">${CAL_TYPES.map(x=>`<option value="${x.id}">${t(x.key)}</option>`).join('')}</select></div>
+          <div class="field grow" style="flex:1;"><label>${t('cal_repeat')}</label>
+            <select id="cRepeat">${REPEATS.map(x=>`<option value="${x.id}">${t(x.key)}</option>`).join('')}</select></div>
+        </div>
+        <div class="field">
+          <label>${t('cal_color')}</label>
+          <div class="color-picker" id="cColors">
+            ${CAL_COLORS.map(c=>`<span class="color-swatch" data-c="${c}" style="background:${c};"></span>`).join('')}
+          </div>
+        </div>
+        <div class="field"><input id="cNote" placeholder="${t('cal_note_ph')}" /></div>
+        <button class="btn" id="cAdd" style="width:100%;">${t('cal_add_event')}</button>
+      </div>
+      <div id="cList"></div>`;
+    // color picker interaction
+    const colorsWrap = $('#cColors', body);
+    colorsWrap.addEventListener('click', (e) => {
+      const sw = e.target.closest('.color-swatch'); if (!sw) return;
+      pickedColor = sw.dataset.c;
+      $$('.color-swatch', colorsWrap).forEach(s => s.classList.remove('sel'));
+      sw.classList.add('sel');
+    });
+    $('#cAdd', body).addEventListener('click', () => {
+      const title = $('#cTitle', body).value.trim();
+      if (!title) { toast(t('cal_need_title')); return; }
+      const list = store.get('calEvents', []);
+      const type = $('#cType',body).value;
+      list.push({ id:uid(), title, type, color: pickedColor || calTypeById(type).color, repeat:$('#cRepeat',body).value,
+        note:$('#cNote',body).value.trim(), date:dateStr, done:false });
+      store.set('calEvents', list); pickedColor = null; draw(); refreshMonth();
+    });
+    const listEl = $('#cList', body);
+    if (!dayEvents.length) { listEl.innerHTML = `<div class="empty">${t('cal_day_empty')}</div>`; return; }
+    listEl.innerHTML = '';
+    dayEvents.forEach(ev => {
+      const type = calTypeById(ev.type);
+      const evColor = ev.color || type.color;
+      const div = document.createElement('div'); div.className='list-item';
+      const repLbl = ev.repeat && ev.repeat!=='none' ? ` · ${t(REPEATS.find(r=>r.id===ev.repeat).key)}` : '';
+      const check = type.payable
+        ? `<div class="checkbox ${ev.done?'done':''}">${ev.done?'✓':''}</div>` : '';
+      div.innerHTML = `
+        ${check}
+        <span class="cal-dot" style="background:${evColor};width:14px;height:14px;"></span>
+        <div class="grow" style="${ev.done?'opacity:0.5;':''}"><strong>${escapeHtml(ev.title)}</strong><br>
+          <span class="muted">${t(type.key)}${repLbl}${ev.note?' · '+escapeHtml(ev.note):''}</span></div>
+        <button class="del">✕</button>`;
+      if (type.payable) div.querySelector('.checkbox').addEventListener('click', () => {
+        const list = store.get('calEvents', []); const e = list.find(x=>x.id===ev.id); e.done=!e.done; store.set('calEvents', list); draw(); refreshMonth();
+      });
+      div.querySelector('.del').addEventListener('click', () => {
+        const list = store.get('calEvents', []); store.set('calEvents', list.filter(x=>x.id!==ev.id)); draw(); refreshMonth();
+      });
+      listEl.appendChild(div);
+    });
+  }
+  draw();
+}
+
+/* =========================================================
+   7. NOTES (auto-save + encrypted notes via Web Crypto)
+   ========================================================= */
+async function deriveKey(password, salt) {
+  const enc = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    { name:'PBKDF2', salt, iterations:150000, hash:'SHA-256' },
+    keyMaterial, { name:'AES-GCM', length:256 }, false, ['encrypt','decrypt']
+  );
+}
+function bufToB64(buf){ return btoa(String.fromCharCode(...new Uint8Array(buf))); }
+function b64ToBuf(b64){ return Uint8Array.from(atob(b64), c=>c.charCodeAt(0)); }
+async function encryptText(text, password) {
+  const enc = new TextEncoder();
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const key = await deriveKey(password, salt);
+  const cipher = await crypto.subtle.encrypt({name:'AES-GCM', iv}, key, enc.encode(text));
+  return { salt:bufToB64(salt), iv:bufToB64(iv), data:bufToB64(cipher) };
+}
+async function decryptText(payload, password) {
+  const key = await deriveKey(password, b64ToBuf(payload.salt));
+  const plain = await crypto.subtle.decrypt({name:'AES-GCM', iv:b64ToBuf(payload.iv)}, key, b64ToBuf(payload.data));
+  return new TextDecoder().decode(plain);
+}
+
+function buildNotes(root) {
+  root.innerHTML = `
+    <button class="btn" id="noteNew" style="width:100%; margin-bottom:6px;">${t('new_note')}</button>
+    <button class="btn secondary" id="noteNewLock" style="width:100%; margin-bottom:14px; display:flex; align-items:center; justify-content:center; gap:8px;">${pixelIconImg('lock',18)} ${t('new_note_lock')}</button>
+    <div id="noteList"></div>`;
+  function draw() {
+    const notes = store.get('notes', []);
+    const el = $('#noteList', root);
+    if (!notes.length) { el.innerHTML = `<div class="empty">${t('notes_empty')}</div>`; return; }
+    el.innerHTML = '';
+    notes.slice().reverse().forEach(n => {
+      const div = document.createElement('div');
+      div.className = 'list-item';
+      const lockImg = n.locked ? pixelIconImg('lock',16) + ' ' : '';
+      const preview = n.locked ? t('protected_note') : (n.text ? escapeHtml(n.text.slice(0,40)) : t('empty_note'));
+      const title = n.title ? escapeHtml(n.title) : (n.locked ? t('protected_note') : (n.text? escapeHtml(n.text.slice(0,24)) : t('untitled')));
+      div.innerHTML = `<div class="grow"><strong>${lockImg}${title}</strong><br><span class="muted">${n.locked?lockImg:''}${preview}</span></div>
+        <button class="del">✕</button>`;
+      div.querySelector('.grow').addEventListener('click', () => openNote(n.id));
+      div.querySelector('.del').addEventListener('click', () => { if (confirm(t('delete_note'))) { store.set('notes', notes.filter(x=>x.id!==n.id)); draw(); } });
+      el.appendChild(div);
+    });
+  }
+  function createNote(locked) {
+    const notes = store.get('notes', []);
+    const n = { id:uid(), title:'', text:'', locked:!!locked, ts:Date.now() };
+    if (locked) n.enc = null;
+    notes.push(n); store.set('notes', notes); draw(); openNote(n.id);
+  }
+  $('#noteNew', root).addEventListener('click', () => createNote(false));
+  $('#noteNewLock', root).addEventListener('click', () => createNote(true));
+  function openNote(id) { openScreen('note-'+id, (body) => noteEditor(body, id, draw), 'note', 'notes'); }
+  draw();
+}
+
+function noteEditor(body, id, refresh) {
+  const notes = store.get('notes', []);
+  const n = notes.find(x => x.id === id);
+  if (!n) { body.innerHTML = `<div class="empty">${t('note_not_found')}</div>`; return; }
+  n.locked ? renderLockedFlow() : renderEditor(n.text);
+
+  function closeSelf() {
+    const screen = document.getElementById('screen-note-'+id);
+    if (screen && screen.classList.contains('open') && history.state && history.state.screen === screen.id) history.back();
+    else if (screen) closeScreen(screen);
+  }
+
+  function renderEditor(initialText) {
+    body.innerHTML = `
+      <div class="field"><input id="nTitle" placeholder="${t('title_ph')}" value="${escapeAttr(n.title||'')}" /></div>
+      <textarea id="nText" placeholder="${t('note_ph')}" style="min-height:44vh;">${escapeHtml(initialText||'')}</textarea>
+      <div class="muted" id="nStatus" style="margin:8px 0;">${t('autosave_on')}</div>
+      <button class="btn" id="nSave" style="width:100%;">${t('save_note')}</button>`;
+    const title = $('#nTitle', body), text = $('#nText', body), status = $('#nStatus', body);
+    let saveTimer;
+    async function persist() {
+      const list = store.get('notes', []);
+      const note = list.find(x=>x.id===id);
+      note.title = title.value;
+      if (note.locked) note.enc = await encryptText(text.value, note._pw);
+      else note.text = text.value;
+      store.set('notes', list);
+      refresh();
+    }
+    function scheduleSave() {
+      clearTimeout(saveTimer);
+      status.textContent = t('typing');
+      saveTimer = setTimeout(async () => { await persist(); status.textContent = t('saved'); }, 600);
+    }
+    title.addEventListener('input', scheduleSave);
+    text.addEventListener('input', scheduleSave);
+    $('#nSave', body).addEventListener('click', async () => {
+      clearTimeout(saveTimer);
+      await persist();
+      toast(t('saved'));
+      closeSelf();
+    });
+  }
+
+  function renderLockedFlow() {
+    if (!n.enc) {
+      body.innerHTML = `
+        <div class="card">
+          <div class="section-title" style="margin-top:0; display:flex; align-items:center; gap:8px;">${pixelIconImg('lock',18)} ${t('set_pw')}</div>
+          <div class="muted" style="margin-bottom:10px;">${t('set_pw_desc')}</div>
+          <div class="field"><input id="pw1" type="password" placeholder="${t('pw')}" /></div>
+          <div class="field"><input id="pw2" type="password" placeholder="${t('pw_repeat')}" /></div>
+          <button class="btn" id="pwSet" style="width:100%;">${t('create_locked')}</button>
+        </div>`;
+      $('#pwSet', body).addEventListener('click', () => {
+        const p1=$('#pw1',body).value, p2=$('#pw2',body).value;
+        if (p1.length<4) { toast(t('pw_short')); return; }
+        if (p1!==p2) { toast(t('pw_mismatch')); return; }
+        n._pw = p1; renderEditor('');
+      });
+    } else {
+      body.innerHTML = `
+        <div class="card">
+          <div class="section-title" style="margin-top:0; display:flex; align-items:center; gap:8px;">${pixelIconImg('lock',18)} ${t('protected_note')}</div>
+          <div class="muted" style="margin-bottom:10px;">${t('unlock_desc')}</div>
+          <div class="field"><input id="pwIn" type="password" placeholder="${t('pw')}" /></div>
+          <button class="btn" id="pwOpen" style="width:100%;">${t('unlock')}</button>
+        </div>`;
+      $('#pwOpen', body).addEventListener('click', async () => {
+        try { const txt = await decryptText(n.enc, $('#pwIn',body).value); n._pw=$('#pwIn',body).value; renderEditor(txt); }
+        catch(e) { toast(t('wrong_pw')); }
+      });
+      $('#pwIn', body).addEventListener('keydown', e => { if(e.key==='Enter') $('#pwOpen',body).click(); });
+    }
+  }
+}
+
+/* =========================================================
+   PET HOOK (placeholder for next step)
+   ========================================================= */
+function notifyPet() { /* Collegato all'animaletto nel prossimo passo */ }
+
+/* =========================================================
+   HELPERS
+   ========================================================= */
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function escapeAttr(s){ return escapeHtml(s); }
+
+/* =========================================================
+   INIT
+   ========================================================= */
+$('#langToggle').addEventListener('click', e => { if (e.target.dataset.lang) setLang(e.target.dataset.lang); });
+document.documentElement.lang = LANG;
+applyLangToggle();
+
+// Theme init
+applyTheme(THEME);
+buildThemeMenu();
+$('#themeBtn').textContent = t('themes_label');
+BG.start();
+$('#themeBtn').addEventListener('click', (e) => {
+  e.stopPropagation();
+  $('#themeMenu').classList.toggle('open');
+});
+document.addEventListener('click', (e) => {
+  const menu = $('#themeMenu');
+  if (menu.classList.contains('open') && !e.target.closest('.theme-wrap')) menu.classList.remove('open');
+});
+
+// Audio toggle
+$('#audioBtn').addEventListener('click', () => {
+  const isOn = AUDIO.toggle();
+  const btn = $('#audioBtn');
+  btn.textContent = isOn ? '🔊' : '🔇';
+  btn.classList.toggle('on', isOn);
+  btn.setAttribute('aria-pressed', isOn ? 'true' : 'false');
+});
+
+$('#appTitle').textContent = t('appTitle');
+renderHome();
+updateGreeting();
+setInterval(updateGreeting, 60000);
+
+window.addEventListener('popstate', () => {
+  const open = $$('.screen.open');
+  if (open.length) closeScreen(open[open.length-1]);
+});
+
+// Register service worker for offline/PWA (skipped on file:// where SW is unsupported)
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+}
+</script>
+</body>
+</html>
