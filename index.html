@@ -204,11 +204,14 @@
     transition: transform 0.28s cubic-bezier(0.4,0,0.2,1);
     max-width: 620px;
     margin: 0 auto;
+    overflow: hidden;
     padding-top: env(safe-area-inset-top);
     padding-left: env(safe-area-inset-left);
     padding-right: env(safe-area-inset-right);
   }
   .screen.open { transform: translateX(0); }
+  .screen-bg { position:absolute; inset:0; width:100%; height:100%; z-index:0; pointer-events:none; }
+  .screen-head, .screen-body { position: relative; z-index: 1; }
   .screen-head {
     padding: 16px 18px;
     display: flex;
@@ -306,6 +309,8 @@
   .big-num { font-size: 2.4rem; font-weight: 800; }
   .progress-track { background: rgba(255,255,255,0.08); border-radius: 999px; height: 14px; overflow: hidden; margin: 8px 0; }
   .progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2)); transition: width 0.4s ease; }
+  .progress-fill.over { background: linear-gradient(90deg, #ef4444, #f87171); }
+  .exp-over { color: #f87171; font-weight: 700; }
 
   /* ---------- Mood ---------- */
   .mood-picker { display: flex; justify-content: space-between; gap: 8px; margin: 10px 0; }
@@ -489,6 +494,16 @@ function applyTheme(id) {
   THEME = th.id; store.set('theme', th.id);
   const rootStyle = document.documentElement.style;
   Object.entries(th.vars).forEach(([k,v]) => rootStyle.setProperty(k, v));
+  // derive a lighter translucent veil from --panel (lower alpha) for mini-app screens
+  const panel = th.vars['--panel'] || 'rgba(30,30,40,0.6)';
+  const m = panel.match(/rgba?\(([^)]+)\)/);
+  if (m) {
+    const parts = m[1].split(',').map(s=>s.trim());
+    const r = parts[0], g = parts[1], b = parts[2];
+    rootStyle.setProperty('--veil', `rgba(${r},${g},${b},0.42)`);
+  } else {
+    rootStyle.setProperty('--veil', 'rgba(20,20,30,0.42)');
+  }
   // theme-color meta for mobile
   const meta = document.querySelector('meta[name="theme-color"]'); if (meta) meta.setAttribute('content', th.vars['--bg']);
   redrawAllIcons();
@@ -525,6 +540,7 @@ const BG = (() => {
   let W = 0, H = 0, dpr = 1;
   let theme = null, sceneId = 'night', parts = [], t0 = 0;
   let running = false, rafId = null;
+  const targets = new Set();   // extra canvases (mini-app windows) that mirror the animation
 
   // which scene each theme uses
   const SCENE = {
@@ -1013,6 +1029,19 @@ const BG = (() => {
         });
         break; }
     }
+    // mirror into mini-app screen canvases (opaque themed animated bg inside each window)
+    if (targets.size) {
+      targets.forEach(tc => {
+        const cw = tc.clientWidth, ch = tc.clientHeight;
+        if (!cw || !ch) return;
+        if (tc.width !== cw * dpr || tc.height !== ch * dpr) { tc.width = cw*dpr; tc.height = ch*dpr; }
+        const tctx = tc.getContext('2d');
+        // source region: the canvas area corresponding to this window (centered max-width column)
+        tctx.setTransform(1,0,0,1,0,0);
+        // draw the full background scaled to the window canvas
+        tctx.drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, tc.width, tc.height);
+      });
+    }
     rafId = requestAnimationFrame(draw);
   }
 
@@ -1088,7 +1117,7 @@ const BG = (() => {
 
   // init
   resize();
-  return { setTheme, start, stop, resize };
+  return { setTheme, start, stop, resize, addTarget:(c)=>targets.add(c), removeTarget:(c)=>targets.delete(c) };
 })();
 
 /* =========================================================
@@ -1585,6 +1614,10 @@ const I18N = {
     amount:'Importo €', category:'Categoria', note_opt:'Nota (opz.)', note_desc:'Descrizione',
     add_expense:'Aggiungi spesa', total_month:'Totale mese', total_year:'Totale anno',
     recent_expenses:'Spese recenti', expense_empty:'Nessuna spesa registrata 💰', valid_amount:'Inserisci un importo valido',
+    exp_history:'Storico giornaliero', exp_limits:'Tetti di spesa', exp_save_limits:'Salva tetti',
+    exp_daily:'Giornaliero', exp_weekly:'Settimanale', exp_monthly:'Mensile', exp_yearly:'Annuale',
+    exp_limit_ph:'nessun limite', exp_over:'Superato!', exp_of:'di', exp_limits_saved:'Tetti salvati',
+    exp_last_days:'Ultimi 14 giorni', exp_currency:'Valuta',
     cats:['Cibo','Trasporti','Casa','Svago','Salute','Altro'],
     // notes
     new_note:'+ Nuova nota', new_note_lock:'Nuova nota protetta', notes_empty:'Nessuna nota 📝',
@@ -1658,6 +1691,10 @@ const I18N = {
     amount:'Amount €', category:'Category', note_opt:'Note (opt.)', note_desc:'Description',
     add_expense:'Add expense', total_month:'Month total', total_year:'Year total',
     recent_expenses:'Recent expenses', expense_empty:'No expenses yet 💰', valid_amount:'Enter a valid amount',
+    exp_history:'Daily history', exp_limits:'Spending limits', exp_save_limits:'Save limits',
+    exp_daily:'Daily', exp_weekly:'Weekly', exp_monthly:'Monthly', exp_yearly:'Yearly',
+    exp_limit_ph:'no limit', exp_over:'Over!', exp_of:'of', exp_limits_saved:'Limits saved',
+    exp_last_days:'Last 14 days', exp_currency:'Currency',
     cats:['Food','Transport','Home','Fun','Health','Other'],
     new_note:'+ New note', new_note_lock:'New protected note', notes_empty:'No notes 📝',
     protected_note:'Protected note', untitled:'Untitled', empty_note:'(empty)',
@@ -2016,12 +2053,16 @@ function openScreen(id, buildFn, titleKey, iconName) {
   el.className = 'screen';
   el.id = 'screen-'+id;
   el.innerHTML = `
+    <canvas class="screen-bg"></canvas>
     <div class="screen-head">
       <button class="back-btn" aria-label="${t('back')}">‹</button>
       <h2><span class="icon-slot"></span>${typeof titleKey==='function'?titleKey():t(titleKey)}</h2>
     </div>
     <div class="screen-body"></div>`;
   screensEl.appendChild(el);
+  // animate the theme background inside this mini-app window
+  const scanvas = el.querySelector('.screen-bg');
+  if (typeof BG !== 'undefined' && BG.addTarget) BG.addTarget(scanvas);
   if (iconName && ICONS[iconName]) el.querySelector('.icon-slot').appendChild(drawPixelIcon(iconName, 3));
   el.querySelector('.back-btn').addEventListener('click', () => { if (history.state && history.state.screen) history.back(); else closeScreen(el); });
   const body = el.querySelector('.screen-body');
@@ -2030,7 +2071,12 @@ function openScreen(id, buildFn, titleKey, iconName) {
   history.pushState({ screen: el.id }, '');
   requestAnimationFrame(() => el.classList.add('open'));
 }
-function closeScreen(el) { if (el) el.classList.remove('open'); }
+function closeScreen(el) {
+  if (!el) return;
+  el.classList.remove('open');
+  const scanvas = el.querySelector('.screen-bg');
+  if (scanvas && typeof BG !== 'undefined' && BG.removeTarget) BG.removeTarget(scanvas);
+}
 
 /* =========================================================
    APP DEFINITIONS
@@ -2640,25 +2686,156 @@ function shopListEditor(body, listId, refreshOverview) {
 /* =========================================================
    6. EXPENSES
    ========================================================= */
+const CURRENCIES = [
+  { code:'EUR', sym:'€' },   // Euro
+  { code:'CZK', sym:'Kč' },  // Corona Ceca
+  { code:'PLN', sym:'zł' },  // Zloty
+  { code:'GBP', sym:'£' },   // Sterlina
+  { code:'USD', sym:'$' },   // Dollaro Americano
+  { code:'JPY', sym:'¥' },   // Yen
+  { code:'CHF', sym:'CHF' }, // Franco svizzero
+  { code:'CNY', sym:'元' },  // Yuan
+  { code:'SEK', sym:'kr' },  // Corona Svedese
+  { code:'DKK', sym:'kr' },  // Corona Danese
+  { code:'NOK', sym:'kr' },  // Corona Norvegese
+  { code:'AED', sym:'د.إ' }, // Dirham EAU (AED)
+];
+function fmtMoney(v) {
+  const c = CURRENCIES.find(x=>x.code===store.get('expCurrency','EUR')) || CURRENCIES[0];
+  const n = Number(v).toFixed(2);
+  return (['CHF'].includes(c.code)) ? `${c.sym} ${n}`
+       : (['SEK','DKK','NOK'].includes(c.code)) ? `${n} ${c.sym}`
+       : `${c.sym}${n}`;
+}
+function curSym() {
+  const c = CURRENCIES.find(x=>x.code===store.get('expCurrency','EUR')) || CURRENCIES[0];
+  return c.sym;
+}
 function buildExpense(root) {
   const cats = t('cats');
+  const curCode = store.get('expCurrency', 'EUR');
   root.innerHTML = `
     <div class="card">
       <div class="row">
         <div class="field grow" style="flex:1;"><label>${t('amount')}</label><input id="eAmt" type="number" inputmode="decimal" placeholder="0.00" /></div>
-        <div class="field grow" style="flex:1;"><label>${t('category')}</label>
-          <select id="eCat">${cats.map((c,i)=>`<option value="${i}">${c}</option>`).join('')}</select>
+        <div class="field grow" style="flex:1;"><label>${t('exp_currency')}</label>
+          <select id="eCur">${CURRENCIES.map(c=>`<option value="${c.code}" ${c.code===curCode?'selected':''}>${c.code} (${c.sym})</option>`).join('')}</select>
         </div>
+      </div>
+      <div class="field"><label>${t('category')}</label>
+        <select id="eCat">${cats.map((c,i)=>`<option value="${i}">${c}</option>`).join('')}</select>
       </div>
       <div class="field"><label>${t('note_opt')}</label><input id="eNote" placeholder="${t('note_desc')}" /></div>
       <button class="btn" id="eAdd" style="width:100%;">${t('add_expense')}</button>
     </div>
-    <div class="stat-grid" style="margin:14px 0;">
-      <div class="stat"><div class="label">${t('total_month')}</div><div class="value" id="eMonth">€0</div></div>
-      <div class="stat"><div class="label">${t('total_year')}</div><div class="value" id="eYear">€0</div></div>
+
+    <div class="section-title">${t('exp_limits')}</div>
+    <div class="card">
+      <div class="row">
+        <div class="field grow" style="flex:1;"><label>${t('exp_daily')} ${curSym()}</label><input id="limD" type="number" inputmode="decimal" placeholder="${t('exp_limit_ph')}" /></div>
+        <div class="field grow" style="flex:1;"><label>${t('exp_weekly')} ${curSym()}</label><input id="limW" type="number" inputmode="decimal" placeholder="${t('exp_limit_ph')}" /></div>
+      </div>
+      <div class="row">
+        <div class="field grow" style="flex:1;"><label>${t('exp_monthly')} ${curSym()}</label><input id="limM" type="number" inputmode="decimal" placeholder="${t('exp_limit_ph')}" /></div>
+        <div class="field grow" style="flex:1;"><label>${t('exp_yearly')} ${curSym()}</label><input id="limY" type="number" inputmode="decimal" placeholder="${t('exp_limit_ph')}" /></div>
+      </div>
+      <button class="btn secondary" id="limSave" style="width:100%;">${t('exp_save_limits')}</button>
     </div>
+    <div id="periodBars"></div>
+
+    <div class="section-title">${t('exp_history')}</div>
+    <div class="muted" style="margin-bottom:6px;">${t('exp_last_days')}</div>
+    <canvas id="expChart" width="320" height="150" style="width:100%; height:150px;"></canvas>
+
     <div class="section-title">${t('recent_expenses')}</div>
     <div id="eList"></div>`;
+
+  const LK = 'expLimits';
+  function getLimits() { return store.get(LK, { d:'', w:'', m:'', y:'' }); }
+  function loadLimits() {
+    const L = getLimits();
+    $('#limD',root).value = L.d||''; $('#limW',root).value = L.w||'';
+    $('#limM',root).value = L.m||''; $('#limY',root).value = L.y||'';
+  }
+  $('#limSave', root).addEventListener('click', () => {
+    store.set(LK, { d:$('#limD',root).value, w:$('#limW',root).value, m:$('#limM',root).value, y:$('#limY',root).value });
+    toast(t('exp_limits_saved')); draw();
+  });
+
+  // date helpers
+  function dayKey(d){ return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate(); }
+  function sameWeek(a,b){ const ms=864e5; const day=(x)=>{const t=new Date(x);t.setHours(0,0,0,0);return t;}; const A=day(a),B=day(b); const monday=(x)=>{const d=new Date(x);const o=(d.getDay()+6)%7;d.setDate(d.getDate()-o);return d;}; return monday(A).getTime()===monday(B).getTime(); }
+
+  function sumFor(list, pred){ return list.reduce((s,e)=> pred(new Date(e.ts)) ? s+e.amt : s, 0); }
+
+  function periodBar(label, spent, limit) {
+    const lim = parseFloat(limit);
+    if (!lim || lim<=0) return '';
+    const pct = Math.min(100, (spent/lim)*100);
+    const over = spent > lim;
+    return `<div class="card" style="padding:12px;">
+      <div class="row" style="justify-content:space-between;">
+        <strong>${label}</strong>
+        <span class="${over?'exp-over':''}">${fmtMoney(spent)} ${t('exp_of')} ${fmtMoney(lim)}${over?' · '+t('exp_over'):''}</span>
+      </div>
+      <div class="progress-track"><div class="progress-fill ${over?'over':''}" style="width:${pct}%;"></div></div>
+    </div>`;
+  }
+
+  function drawPeriodBars() {
+    const list = store.get('expenses', []);
+    const now = new Date();
+    const L = getLimits();
+    const daySum = sumFor(list, d => dayKey(d)===dayKey(now));
+    const weekSum = sumFor(list, d => sameWeek(d, now));
+    const monthSum = sumFor(list, d => d.getFullYear()===now.getFullYear() && d.getMonth()===now.getMonth());
+    const yearSum = sumFor(list, d => d.getFullYear()===now.getFullYear());
+    $('#periodBars', root).innerHTML =
+      periodBar(t('exp_daily'), daySum, L.d) +
+      periodBar(t('exp_weekly'), weekSum, L.w) +
+      periodBar(t('exp_monthly'), monthSum, L.m) +
+      periodBar(t('exp_yearly'), yearSum, L.y);
+  }
+
+  function drawChart() {
+    const canvas = $('#expChart', root); if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const dpr = Math.min(window.devicePixelRatio||1, 2);
+    const cw = canvas.clientWidth || 320, ch = 150;
+    canvas.width = cw*dpr; canvas.height = ch*dpr; ctx.setTransform(dpr,0,0,dpr,0,0);
+    ctx.clearRect(0,0,cw,ch);
+    const list = store.get('expenses', []);
+    const L = getLimits(); const dLim = parseFloat(L.d);
+    // last 14 days totals
+    const days = [];
+    for (let i=13;i>=0;i--){ const d=new Date(); d.setDate(d.getDate()-i); const k=dayKey(d);
+      const sum = list.reduce((s,e)=> dayKey(new Date(e.ts))===k ? s+e.amt : s, 0);
+      days.push({ d, sum });
+    }
+    const max = Math.max(dLim||0, ...days.map(x=>x.sum), 1);
+    const padB = 22, padL = 4, padR = 4, top = 8;
+    const bw = (cw - padL - padR) / days.length;
+    const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#8b7cf6';
+    const dim = getComputedStyle(document.documentElement).getPropertyValue('--text-dim').trim() || '#999';
+    // limit line
+    if (dLim>0) {
+      const ly = top + (ch-padB-top) * (1 - dLim/max);
+      ctx.strokeStyle = 'rgba(248,113,113,0.8)'; ctx.setLineDash([5,4]); ctx.lineWidth=1.5;
+      ctx.beginPath(); ctx.moveTo(padL, ly); ctx.lineTo(cw-padR, ly); ctx.stroke(); ctx.setLineDash([]);
+    }
+    const locale = LANG==='en'?'en-GB':'it-IT';
+    days.forEach((x, i) => {
+      const h = (ch-padB-top) * (x.sum/max);
+      const bx = padL + i*bw, by = ch - padB - h;
+      const over = dLim>0 && x.sum > dLim;
+      ctx.fillStyle = over ? '#f87171' : accent;
+      ctx.fillRect(bx+2, by, bw-4, Math.max(0,h));
+      // day label (every other)
+      if (i % 2 === 1) { ctx.fillStyle = dim; ctx.font = '9px sans-serif'; ctx.textAlign='center';
+        ctx.fillText(x.d.getDate(), bx+bw/2, ch-8); }
+    });
+  }
+
   function draw() {
     const list = store.get('expenses', []);
     const now = new Date();
@@ -2667,8 +2844,12 @@ function buildExpense(root) {
       const d = new Date(e.ts);
       if (d.getFullYear()===now.getFullYear()) { year+=e.amt; if (d.getMonth()===now.getMonth()) month+=e.amt; }
     });
-    $('#eMonth', root).textContent = '€'+month.toFixed(2);
-    $('#eYear', root).textContent = '€'+year.toFixed(2);
+    // (kept for compatibility if stat elements exist)
+    const em = $('#eMonth', root), ey = $('#eYear', root);
+    if (em) em.textContent = fmtMoney(month);
+    if (ey) ey.textContent = fmtMoney(year);
+    drawPeriodBars();
+    drawChart();
     const el = $('#eList', root);
     if (!list.length) { el.innerHTML = `<div class="empty">${t('expense_empty')}</div>`; return; }
     el.innerHTML = '';
@@ -2678,7 +2859,7 @@ function buildExpense(root) {
       div.className = 'list-item';
       const d = new Date(e.ts).toLocaleDateString(locale,{day:'numeric',month:'short'});
       const catName = t('cats')[e.catIdx] ?? e.cat ?? '';
-      div.innerHTML = `<div class="grow"><strong>€${e.amt.toFixed(2)}</strong> <span class="pill">${catName}</span><br>
+      div.innerHTML = `<div class="grow"><strong>${fmtMoney(e.amt)}</strong> <span class="pill">${catName}</span><br>
         <span class="muted">${d}${e.note?' · '+escapeHtml(e.note):''}</span></div>
         <button class="del">✕</button>`;
       div.querySelector('.del').addEventListener('click', () => { store.set('expenses', list.filter(x=>x.id!==e.id)); draw(); });
@@ -2694,6 +2875,11 @@ function buildExpense(root) {
     $('#eAmt',root).value=''; $('#eNote',root).value='';
     draw();
   });
+  $('#eCur', root).addEventListener('change', (e) => {
+    store.set('expCurrency', e.target.value);
+    buildExpense(root); // rebuild so symbols in labels/totals update everywhere
+  });
+  loadLimits();
   draw();
 }
 
