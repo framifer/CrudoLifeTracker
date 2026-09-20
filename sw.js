@@ -1,5 +1,5 @@
 /* CrudoLife Tracker service worker — offline app shell caching */
-const CACHE = 'crudolife-v15';
+const CACHE = 'crudolife-v19';
 const ASSETS = [
   './',
   './index.html',
